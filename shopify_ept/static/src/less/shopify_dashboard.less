@@ -1,0 +1,23 @@
+.o_kanban_view.o_kanban_dashboard.o_shopify_kanban {
+    @sale-table-spacing: 10px;
+
+    .o_kanban_record {
+	    min-height: auto;
+	    width: 50%;
+	    margin: 0;
+	    padding: 5px;
+	    border: 0;
+        
+        @media (max-width: 1200px) {
+            width:100%
+        }
+        
+        @media (min-width: @screen-sm-min) {
+            //min-width: 420px;
+        }
+        .record_border {
+        	border: 1px solid #d9d7d7;
+        }
+    }        
+}
+
