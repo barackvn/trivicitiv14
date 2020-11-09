@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+        <record id="view_partner_category_form_inherit" model="ir.ui.view">
+            <field name="name">res.partner.category.form.inherit</field>
+            <field name="model">res.partner.category</field>
+            <field name="type">form</field>
+            <field name="inherit_id" ref="base.view_partner_category_form"/>
+            <field name="arch" type="xml">
+                <field name="name" position="after">
+                    <field name="analytic_account_id"/>
+                    <field name="fiscal_position_id"/>
+                </field>
+            </field>
+        </record>
+
+        <!-- base.view_partner_category_form -->
+        <menuitem id="menu_action_partner_category_form" name="Contact Tags" parent="sale.menu_sales_config" action="base.action_partner_category_form" sequence="5"/>
+    </data>
+</odoo>
