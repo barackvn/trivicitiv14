@@ -11,10 +11,52 @@
                     <field name="analytic_account_id"/>
                     <field name="fiscal_position_id"/>
                 </field>
+                <field name="active" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </field>
             </field>
         </record>
 
-        <!-- base.view_partner_category_form -->
+        <record id="view_partner_category_list_inherit" model="ir.ui.view">
+            <field name="name">res.partner.category.tree.inherit</field>
+            <field name="model">res.partner.category</field>
+            <field name="type">tree</field>
+            <field name="inherit_id" ref="base.view_partner_category_list"/>
+            <field name="arch" type="xml">
+                <field name="display_name" position="after">
+                    <field name="analytic_account_id"/>
+                    <field name="fiscal_position_id"/>
+                </field>
+            </field>
+        </record>
+
+        <!-- res partner category search view -->
+        <record id="view_res_partner_category_view_search_inherit" model="ir.ui.view">
+            <field name="name">res.partner.category.search.inherit</field>
+            <field name="model">res.partner.category</field>
+            <field name="type">search</field>
+            <field name="inherit_id" ref="base.res_partner_category_view_search"/>
+            <field name="arch" type="xml">
+                <field name="display_name" position="after">
+                    <field name="analytic_account_id"/>
+                    <field name="fiscal_position_id"/>
+                </field>
+                <xpath expr="//search" position="inside">
+                    <group expand="1" string="Group By">
+                        <filter string="Name" name="name" context="{'group_by':'name'}" />
+                        <filter string="Parent Id" name="parent" context="{'group_by':'parent_id'}" />
+                        <separator/>
+                        <filter string="Analytic Account" name="analytic_account" context="{'group_by':'analytic_account_id'}"/>
+                        <filter string="Fiscal Position" name="fiscal_position" context="{'group_by':'fiscal_position_id'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name ="parent_id" icon ="fa-users"/>
+                    </searchpanel>
+                </xpath>
+            </field>
+        </record>
+
+
         <menuitem id="menu_action_partner_category_form" name="Contact Tags" parent="sale.menu_sales_config" action="base.action_partner_category_form" sequence="5"/>
     </data>
 </odoo>
