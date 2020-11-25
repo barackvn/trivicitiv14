@@ -118,9 +118,9 @@ class ProductProduct(models.Model):
             result = self._cr.dictfetchall()
 
         qry = ("""select product_id from stock_move where date >= '%s' and
-                 state in ('partially_available','assigned','done')""", date)
+                 state in ('partially_available','assigned','done')""" % date)
         if company:
-            qry += ("""and company_id = %d""", company.id)
+            qry += ("""and company_id = %d""" % company.id)
 
         self._cr.execute(qry)
         result += self._cr.dictfetchall()
