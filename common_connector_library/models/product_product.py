@@ -113,7 +113,7 @@ class ProductProduct(models.Model):
                     inner join mrp_bom_line as ml on ml.bom_id=mb.id
                     inner join stock_move as sm on sm.product_id=ml.product_id
                     where sm.date >= '%s' and sm.company_id = %d and sm.state in 
-                    ('partially_available','assigned','done')""", date, company.id)
+                    ('partially_available','assigned','done')""" % (date, company.id))
             self._cr.execute(mrp_qry)
             result = self._cr.dictfetchall()
 
@@ -155,7 +155,7 @@ class ProductProduct(models.Model):
         if mrp_module:
             qry = ("""select p.id as product_id from product_product as p
                         inner join mrp_bom as mb on mb.product_tmpl_id=p.product_tmpl_id
-                        and p.id in (%s)""", product_ids)
+                        and p.id in (%s)""" % product_ids)
             self._cr.execute(qry)
             bom_product_ids = self._cr.dictfetchall()
             bom_product_ids = [product_id.get('product_id') for product_id in bom_product_ids]
@@ -193,8 +193,8 @@ class ProductProduct(models.Model):
                 union all
                 select product_id as product_id, sum(product_qty) as stock from stock_move
                 where state in ('assigned') and product_id in (%s) and location_dest_id in (%s)
-                group by product_id) as test""", location_ids, simple_product_list_ids,
-                 simple_product_list_ids, location_ids)
+                group by product_id) as test""" % (location_ids, simple_product_list_ids,
+                 simple_product_list_ids, location_ids))
         return query
 
     def get_free_qty_ept(self, warehouse, product_list):
