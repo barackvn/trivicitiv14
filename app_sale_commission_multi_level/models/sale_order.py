@@ -87,7 +87,7 @@ class SaleOrder(models.Model):
             # create 报销整合单
             if len(exps):
                 action = exps.action_submit_expenses()
-                new_context = action['context']
+                new_context = action.get('context') or {}
                 try:
                     new_context.update({'default_name': '%s:%s' % (self.name, product.name)})
                 except Exception as e:
