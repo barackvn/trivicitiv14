@@ -6,13 +6,14 @@
     'author': u'Silentinfotech Pvt. Ltd.',
     'website': '',
     # Dependencies
-    'depends': ['base', 'sale'],
+    'depends': ['base', 'sale', 'account_asset', 'account_check_printing'],
     
     # Views
     'init_xml': [],
     'data': [
         'view/crm_tag_view.xml',
-        'view/res_partner_view.xml',    
+        'view/res_partner_view.xml',
+        'view/account_payment_view.xml',
              ],
     'demo_xml': [],
     
