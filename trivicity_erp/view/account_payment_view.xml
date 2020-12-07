@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_payment_check_printing_search" model="ir.ui.view">
+        <field name="name">account.payment.check.printing.search</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account_check_printing.view_payment_check_printing_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='checks_to_send']" position="attributes">
+                <attribute name="domain">[('payment_method_id.code', '=', 'check_printing'), ('state', '=', 'posted'), ('check_number', '=', False)]</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
