@@ -6,3 +6,5 @@ from . import account_journal
 from . import order_data_queue_ept
 from . import product_data_queue
 from . import process_import_export
+from . import box_package
+from . import mrp_production
