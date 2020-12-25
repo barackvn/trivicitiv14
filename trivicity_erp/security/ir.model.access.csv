@@ -1,2 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_asset_type,access_asset_type,trivicity_erp.model_asset_type,,1,1,1,1
+access_box_package,access_box_package,trivicity_erp.model_box_package,mrp.group_mrp_user,1,1,1,1
+access_box_package_move,access_box_package_move,trivicity_erp.model_box_package_move,mrp.group_mrp_user,1,1,1,1

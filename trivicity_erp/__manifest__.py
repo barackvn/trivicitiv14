@@ -12,11 +12,15 @@
     'init_xml': [],
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_sequence.xml',
         'view/crm_tag_view.xml',
         'view/res_partner_view.xml',
         'view/asset_type_view.xml',
         'view/account_asset_view.xml',
         'view/account_payment_view.xml',
+        'view/box_package_view.xml',
+        'view/mrp_production_view.xml',
+        
              ],
     'demo_xml': [],
     
