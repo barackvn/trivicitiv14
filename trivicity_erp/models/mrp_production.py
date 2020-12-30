@@ -7,4 +7,4 @@ class MrpProduction(models.Model):
     _inherit = 'mrp.production'
 
     box_package_id = fields.Many2one(
-        'box.package', 'Box Packaging', copy=False)
+        'box.package', 'Box Packaging', readonly=True, copy=False)
