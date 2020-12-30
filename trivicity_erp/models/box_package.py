@@ -3,11 +3,16 @@
 import datetime
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from xlrd import open_workbook
+import base64
+import openpyxl
+from tempfile import TemporaryFile
 
 class BoxPackage(models.Model):
     _name = 'box.package'
     _description='Box Packaging'
     _rec_name = 'name'
+    _order = 'name desc'
 
     @api.model
     def _get_default_date_planned_start(self):
@@ -67,7 +72,7 @@ class BoxPackage(models.Model):
     product_tmpl_id = fields.Many2one('product.template', 'Product Template', related='product_id.product_tmpl_id')
     user_id = fields.Many2one('res.users', 'Responsible', default=lambda self: self.env.user, states={'done': [('readonly', True)], 'cancel': [('readonly', True)]},
         domain=lambda self: [('groups_id', 'in', self.env.ref('mrp.group_mrp_user').id)])
-    upload_file = fields.Binary('Upload File', required=True, states={'done': [('readonly', True)], 'cancel': [('readonly', True)]})
+    upload_file = fields.Binary('Upload File', states={'done': [('readonly', True)], 'cancel': [('readonly', True)]})
     filename = fields.Char()
     move_raw_ids = fields.One2many('box.package.move', 'raw_material_box_package_id', string='Components')
     picking_type_id = fields.Many2one(
@@ -93,9 +98,24 @@ class BoxPackage(models.Model):
         readonly=True, required=True,
         domain="[('usage','=','internal'), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
         states={'draft': [('readonly', False)]}, check_company=True)
-    mo_count = fields.Integer(compute='compute_mo_count') 
+    mo_count = fields.Integer(compute='compute_mo_count')
 
-
+    @api.onchange('upload_file', 'filename')
+    def _onchange_upload_file(self):
+        if not self.state == 'draft':            
+            mo_objs = self.env['mrp.production'].search([('box_package_id', '=', self.name),('state','not in',('draft','cancel'))])            
+            if mo_objs:
+                for mo in mo_objs:
+                    if mo.unreserve_visible == True or mo.state in ('to_close','progress','confirm'):
+                        ans = mo.button_unreserve()
+                        for move in mo.move_raw_ids:                            
+                            for move_line in move.move_line_ids:                                
+                                move_line.write({
+                                    'qty_done': move_line.product_uom_qty
+                                })
+                        if mo.product_id.tracking == 'serial':
+                            mo.write({'qty_producing': 0 })
+                
     def action_view_mo(self):
         mo_obj = self.env['mrp.production'].search([('box_package_id', '=', self.id)])
         mo_ids = []
@@ -126,6 +146,17 @@ class BoxPackage(models.Model):
         for record in self:
             record.mo_count = self.env['mrp.production'].search_count(
                 [('box_package_id', '=', self.id)])
+    
+    @api.onchange('picking_type_id')
+    def onchange_picking_type(self):
+        location = self.env.ref('stock.stock_location_stock')
+        try:
+            location.check_access_rule('read')
+        except (AttributeError, AccessError):
+            location = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1).lot_stock_id
+        self.location_src_id = self.picking_type_id.default_location_src_id.id or location.id
+        self.location_dest_id = self.picking_type_id.default_location_dest_id.id or location.id
+
 
     @api.depends('product_id', 'bom_id', 'company_id')
     def _compute_allowed_product_ids(self):
@@ -150,7 +181,7 @@ class BoxPackage(models.Model):
         self.product_qty = self.bom_id.product_qty or 1.0
         self.product_uom_id = self.bom_id and self.bom_id.product_uom_id.id or self.product_id.uom_id.id
         self.move_raw_ids = [(2, move.id) for move in self.move_raw_ids.filtered(lambda m: m.bom_line_id)]
-        self.picking_type_id = self.bom_id.picking_type_id or self.picking_type_id        
+        self.picking_type_id = self.bom_id.picking_type_id or self.picking_type_id
 
     @api.onchange('product_id', 'picking_type_id', 'company_id')
     def onchange_product_id(self):
@@ -172,24 +203,24 @@ class BoxPackage(models.Model):
     def _onchange_move_raw(self):        
         if self.product_id and not self.bom_id:
             self.move_raw_ids = [(5,)]
-        if not self.bom_id and not self._origin.product_id:            
+        if not self.bom_id and not self._origin.product_id:
             return
         # Clear move raws if we are changing the product. In case of creation (self._origin is empty),
         # we need to avoid keeping incorrect lines, so clearing is necessary too.
-        if self.product_id != self._origin.product_id or not self.product_id:            
-            self.move_raw_ids = [(5,)]       
+        if self.product_id != self._origin.product_id:
+            self.move_raw_ids = [(5,)]
         if self.bom_id and self.product_qty > 0:
             # keep manual entries
-            list_move_raw = [(4, move.id) for move in self.move_raw_ids.filtered(lambda m: not m.bom_line_id)]
+            list_move_raw = [(4, box_move.id) for box_move in self.move_raw_ids.filtered(lambda m: not m.bom_line_id)]            
             moves_raw_values = self._get_moves_raw_values()            
-            move_raw_dict = {move.bom_line_id.id: move for move in self.move_raw_ids.filtered(lambda m: m.bom_line_id)}
+            move_raw_dict = {move.bom_line_id.id: move for move in self.move_raw_ids.filtered(lambda m: m.bom_line_id)}            
             for move_raw_values in moves_raw_values:
                 if move_raw_values['bom_line_id'] in move_raw_dict:
                     # update existing entries
                     list_move_raw += [(1, move_raw_dict[move_raw_values['bom_line_id']].id, move_raw_values)]
                 else:
                     # add new entries
-                    list_move_raw += [(0, 0, move_raw_values)]
+                    list_move_raw += [(0, 0, move_raw_values)]            
             self.move_raw_ids = list_move_raw
         else:
             self.move_raw_ids = [(2, move.id) for move in self.move_raw_ids.filtered(lambda m: m.bom_line_id)]
@@ -214,11 +245,11 @@ class BoxPackage(models.Model):
         return moves
 
     def _get_move_raw_values(self, product_id, product_uom_qty, product_uom, operation_id=False, bom_line=False):
-        data = {            
+        data = {
             'bom_line_id': bom_line.id if bom_line else False,
             'product_id': product_id.id,
             'product_uom_qty': product_uom_qty,
-            'product_uom': product_uom.id,            
+            'product_uom': product_uom.id,
             'raw_material_box_package_id': self.id,
             'origin': self.name,
             'company_id': self.company_id.id,
@@ -232,10 +263,30 @@ class BoxPackage(models.Model):
         result = super(BoxPackage, self).create(vals)
         return result
 
+    def button_done(self):
+        if not self.state == 'draft':
+            mo_objs = self.env['mrp.production'].search([('box_package_id', '=', self.name),('state','in',('confirmed','progress','to_close'))])            
+            if mo_objs:
+                if any(production.reservation_state != 'assigned' for production in mo_objs):
+                    raise UserError(_('Please first reserve stock for all the manufacturing order using "Check Availability" feature.'))
+                if all(production.reservation_state == 'assigned' for production in mo_objs):
+                    for mo in mo_objs:
+                        wiz_act = mo.button_mark_done()
+                        # print("wiz_act",wiz_act)
+                         # if wiz_act:
+                    #     wiz = self.env[wiz_act['res_model']].browse(wiz_act['context']['params']['id'])
+                    #     ans = wiz.process()
+                    #     print("ans",wiz_act, wiz, ans)
+
+                if all(production.state == 'done' for production in mo_objs):
+                    self.write({'state': 'done'})
+                   
     def action_cancel(self):
         return self.write({'state': 'cancel'})
 
+
     def action_confirm(self):
+        list_create_mo = []
         for rec in range(int(self.product_qty)):
             rec=rec+1
             lst = []
@@ -247,7 +298,10 @@ class BoxPackage(models.Model):
                         'product_uom': i.product_uom.id,
                         'company_id': i.company_id.id,
                         'location_id': self.location_src_id.id,
-                        'location_dest_id': self.location_dest_id.id,
+                        'location_dest_id': self.product_id.with_company(self.company_id).property_stock_production.id,
+                        'bom_line_id': i.bom_line_id.id if i.bom_line_id else False,
+                        'warehouse_id': self.location_src_id.get_warehouse().id,
+                        'procure_method': 'make_to_stock',                        
                 }))
             mrp_vales = {
                     'product_id': self.product_id.id,
@@ -264,20 +318,82 @@ class BoxPackage(models.Model):
                     'location_dest_id': self.location_dest_id.id,
                     'move_raw_ids': lst
             }
-            mp = self.env['mrp.production'].create(mrp_vales)            
-        return self.write({'state': 'confirm'})
+            list_create_mo.append(mrp_vales)
+        mp = self.env['mrp.production'].create(list_create_mo)        
+        for record in mp:
+            ans = record.action_confirm()
 
-    @api.constrains('filename')
+        return self.write({'state':'confirm'})
+
+    def action_assign(self):
+        mo_objs = self.env['mrp.production'].search([('box_package_id', '=', self.id)])
+        self._check_filename()
+        data = self.import_data_form_file()
+        if data:
+            index = 0                        
+            list_keys = list(data.keys())            
+            unique_list = []
+            for key_data in list_keys:                
+                dup_found = self.env['stock.production.lot'].search([('name','=', key_data)])
+                if not dup_found:
+                    unique_list.append(key_data)
+            for production in mo_objs:
+                if not production.lot_producing_id:
+                    if len(unique_list) > index:                       
+                        lot = self.env['stock.production.lot'].create({
+                            'name': unique_list[index],
+                            'product_id': self.product_id.id,
+                            'company_id': self.env.company.id,
+                        })                        
+                        index += 1
+                        production.write({
+                            'lot_producing_id': lot.id,
+                        })
+                    else:
+                        raise UserError(_('File lot is not enough Please upload another lots.'))
+                if production.lot_producing_id:
+                    production.move_raw_ids._action_assign()
+                    for move in production.move_raw_ids:                        
+                        for move_line in move.move_line_ids:                            
+                            move_line.write({
+                                'qty_done': move_line.product_uom_qty
+                            })
+                    if production.product_id.tracking == 'serial':
+                        result = production._set_qty_producing()                        
+        return True
+
+    def import_data_form_file(self):        
+        # Generating of the excel file to be read by openpyxl
+        file = base64.decodebytes(self.upload_file)
+        # file = self.upload_file.decode('base64')
+        excel_fileobj = TemporaryFile('wb+')
+        excel_fileobj.write(file)
+        excel_fileobj.seek(0)
+        # Create workbook
+        workbook = openpyxl.load_workbook(excel_fileobj, data_only=True)
+        # Get the first sheet of excel file
+        sheet = workbook[workbook.get_sheet_names()[0]]        
+        if sheet.max_column != 2 and sheet.min_column != 2:
+            raise ValidationError(_("Please upload 2 Columns NFC tag and Lot information."))        
+        data = {}
+        for row in sheet.rows:
+            # Get value
+            data[row[0].value] = row[1].value        
+        return data
+
+
     def _check_filename(self):
         if self.upload_file:
             if not self.filename:
                 raise ValidationError(_("There is no file"))
             else:
-                # Check the file's extension             
+                # Check the file's extension
                 tmp = self.filename.split('.')
                 ext = tmp[len(tmp)-1]
                 if ext != 'xlsx':
                     raise ValidationError(_("The file must be a xlsx file"))
+        else:
+            raise ValidationError(_("Please upload NFC tag and Lot information."))
 
 
 class BoxPackageMove(models.Model):
@@ -302,8 +418,3 @@ class BoxPackageMove(models.Model):
     product_uom_category_id = fields.Many2one(related='product_id.uom_id.category_id')
     origin = fields.Char("Source Document")
     quantity_done = fields.Float('Quantity Done', digits='Product Unit of Measure')
-
-
-
-    
-
