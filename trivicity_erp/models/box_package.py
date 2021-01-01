@@ -15,6 +15,13 @@ class BoxPackage(models.Model):
     _order = 'name desc'
 
     @api.model
+    def default_get(self, fields):
+        res = super(BoxPackage, self).default_get(fields)
+        res['filename'] = None
+        return res
+
+
+    @api.model
     def _get_default_date_planned_start(self):
         if self.env.context.get('default_date_deadline'):
             return fields.Datetime.to_datetime(self.env.context.get('default_date_deadline'))
@@ -72,8 +79,8 @@ class BoxPackage(models.Model):
     product_tmpl_id = fields.Many2one('product.template', 'Product Template', related='product_id.product_tmpl_id')
     user_id = fields.Many2one('res.users', 'Responsible', default=lambda self: self.env.user, states={'done': [('readonly', True)], 'cancel': [('readonly', True)]},
         domain=lambda self: [('groups_id', 'in', self.env.ref('mrp.group_mrp_user').id)])
-    upload_file = fields.Binary('Upload File', states={'done': [('readonly', True)], 'cancel': [('readonly', True)]})
-    filename = fields.Char()
+    upload_file = fields.Binary('Upload File', states={'done': [('readonly', True)], 'cancel': [('readonly', True)]} ,copy=False)
+    filename = fields.Char(copy=False)
     move_raw_ids = fields.One2many('box.package.move', 'raw_material_box_package_id', string='Components')
     picking_type_id = fields.Many2one(
         'stock.picking.type', 'Operation Type',default=_get_default_picking_type, domain="[('code', '=', 'mrp_operation'), ('company_id', '=', company_id)]", required=True)
@@ -82,7 +89,7 @@ class BoxPackage(models.Model):
         ('draft', 'Draft'),
         ('confirm', 'Confirmed'),
         ('done', 'Done'),
-        ('cancel', 'Cancelled')], string='State',copy=False, default="draft")
+        ('cancel', 'Canceled')], string='State',copy=False, default="draft")
     company_id = fields.Many2one(
         'res.company', 'Company', default=lambda self: self.env.company,
         index=True, required=True)
@@ -282,6 +289,10 @@ class BoxPackage(models.Model):
                     self.write({'state': 'done'})
                    
     def action_cancel(self):
+        mo_obj = self.env['mrp.production'].search([('box_package_id', '=', self.id)])
+        if mo_obj:
+           for rec in mo_obj:
+               rec.update({'state':'cancel'})
         return self.write({'state': 'cancel'})
 
 
@@ -394,6 +405,13 @@ class BoxPackage(models.Model):
                     raise ValidationError(_("The file must be a xlsx file"))
         else:
             raise ValidationError(_("Please upload NFC tag and Lot information."))
+
+
+    def unlink(self):
+        for record in self:
+            if record.state in ('confirm', 'cancel','done'):
+                raise UserError(_("You can delete only draft state record!"))
+        return super(BoxPackage, self).unlink()
 
 
 class BoxPackageMove(models.Model):
