@@ -12,7 +12,7 @@
                         <button name="button_done" attrs="{'invisible': [('state', 'not in', ('confirm'))]}" string="Done" type="object" class="oe_highlight"/>
                         <button name="action_cancel" type="object" string="Cancel"
                             attrs="{'invisible': [('state', 'in', ('done', 'cancel'))]}"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,confirm,done"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,confirm,done,cancel"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
