@@ -309,7 +309,7 @@ class BoxPackage(models.Model):
                         'location_dest_id': self.product_id.with_company(self.company_id).property_stock_production.id,
                         'bom_line_id': i.bom_line_id.id if i.bom_line_id else False,
                         'warehouse_id': self.location_src_id.get_warehouse().id,
-                        'procure_method': 'make_to_stock',                        
+                        'procure_method': 'make_to_stock',
                 }))
             mrp_vales = {
                     'product_id': self.product_id.id,
@@ -329,6 +329,7 @@ class BoxPackage(models.Model):
             list_create_mo.append(mrp_vales)
         mp = self.env['mrp.production'].create(list_create_mo)        
         for record in mp:
+            record._onchange_move_finished()
             ans = record.action_confirm()
 
         return self.write({'state':'confirm'})
