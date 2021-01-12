@@ -49,7 +49,8 @@
                                     attrs="{'readonly': [('state', 'not in', ('draft'))]}" options="{'delete': [('state', '=', 'draft')]}">
                                     <tree editable="bottom">
                                         <field name="company_id" invisible="1"/>
-                                        <field name="product_uom_category_id" invisible="1"/>                                        
+                                        <field name="bom_line_id" invisible="1"/>
+                                        <field name="product_uom_category_id" invisible="1"/>
                                         <field name="product_id" force_save="1" required="1" context="{'default_type': 'product'}"/>
                                         <field name="product_uom_qty" widget="mrp_should_consume" string="To Consume" width="1"/>
                                         <field name="product_uom" options="{'no_open': True, 'no_create': True}" groups="uom.group_uom"/>                                        

@@ -2,17 +2,18 @@
 
 import datetime
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError, ValidationError, AccessError
 from xlrd import open_workbook
 import base64
 import openpyxl
 from tempfile import TemporaryFile
 
+
 class BoxPackage(models.Model):
     _name = 'box.package'
     _description='Box Packaging'
     _rec_name = 'name'
-    _order = 'name desc'
+    _order = 'id desc'
 
     @api.model
     def default_get(self, fields):
@@ -81,7 +82,7 @@ class BoxPackage(models.Model):
         domain=lambda self: [('groups_id', 'in', self.env.ref('mrp.group_mrp_user').id)])
     upload_file = fields.Binary('Upload File', states={'done': [('readonly', True)], 'cancel': [('readonly', True)]} ,copy=False)
     filename = fields.Char(copy=False)
-    move_raw_ids = fields.One2many('box.package.move', 'raw_material_box_package_id', string='Components')
+    move_raw_ids = fields.One2many('box.package.move', 'raw_material_box_package_id', string='Components', copy=True)
     picking_type_id = fields.Many2one(
         'stock.picking.type', 'Operation Type',default=_get_default_picking_type, domain="[('code', '=', 'mrp_operation'), ('company_id', '=', company_id)]", required=True)
     origin = fields.Char('Source', copy=False)
@@ -205,11 +206,8 @@ class BoxPackage(models.Model):
                 self.bom_id = False
                 self.product_uom_id = self.product_id.uom_id.id
 
-
     @api.onchange('bom_id', 'product_id', 'product_qty', 'product_uom_id')
-    def _onchange_move_raw(self):        
-        if self.product_id and not self.bom_id:
-            self.move_raw_ids = [(5,)]
+    def _onchange_move_raw(self):
         if not self.bom_id and not self._origin.product_id:
             return
         # Clear move raws if we are changing the product. In case of creation (self._origin is empty),
@@ -294,7 +292,6 @@ class BoxPackage(models.Model):
            for rec in mo_obj:
                rec.update({'state':'cancel'})
         return self.write({'state': 'cancel'})
-
 
     def action_confirm(self):
         list_create_mo = []
