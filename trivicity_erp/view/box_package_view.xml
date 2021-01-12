@@ -8,11 +8,11 @@
                 <form>
                     <header>
                         <button name="action_confirm" attrs="{'invisible': [('state', '!=', 'draft')]}" string="Confirm" type="object" class="oe_highlight"/>
-                        <button name="action_assign" attrs="{'invisible': [('state', 'in', ('draft', 'done', 'cancel'))]}" string="Check availability" type="object"/>
+                        <button name="action_assign" attrs="{'invisible': [('state', 'in', ('draft', 'done', 'cancel'))]}" string="Check availability" type="object" class="oe_highlight"/>
                         <button name="button_done" attrs="{'invisible': [('state', 'not in', ('confirm'))]}" string="Done" type="object" class="oe_highlight"/>
                         <button name="action_cancel" type="object" string="Cancel"
                             attrs="{'invisible': [('state', 'in', ('done', 'cancel'))]}"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,confirm,done,cancel"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,confirm,done"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
@@ -53,6 +53,7 @@
                                         <field name="product_uom_category_id" invisible="1"/>
                                         <field name="product_id" force_save="1" required="1" context="{'default_type': 'product'}"/>
                                         <field name="product_uom_qty" widget="mrp_should_consume" string="To Consume" width="1"  attrs="{'column_invisible': [('parent.state', '=', 'done')]}"/>
+                                        <field name="forecast_availability" string="Reserved" attrs="{'column_invisible': [('parent.state', 'in', ['draft', 'done'])]}"/>
                                         <field name="quantity_done" string="Consumed"
                                             attrs="{'column_invisible': [('parent.state', '!=', 'done')]}"/>
                                         <field name="product_uom" options="{'no_open': True, 'no_create': True}" groups="uom.group_uom"/>

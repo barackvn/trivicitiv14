@@ -359,9 +359,12 @@ class BoxPackage(models.Model):
                     index += 1
                 else:
                     note = ''
+                    if len(list_keys) != len(mo_objs):
+                        note = 'Found only ' + str(len(list_keys)) + ' NFC tags, but required ' + str(len(mo_objs)) + ' NFC tag information.\n'
                     if already_assigned:
-                        note = 'Already assigned these NFC tags: ' + ".\n".join(l for l in already_assigned)
-                    raise UserError(_('File lot is not enough Please upload another lots. %s', note))
+                        note = note + ",".join(l for l in already_assigned) + ' NFC tags are already assigned to existing box. Please verify uploaded information. '
+                    if note:
+                        raise UserError(_(note))
             if self._context.get('assign_lot'):
                 index = 0
                 for production in mo_objs:
@@ -544,7 +547,7 @@ class BoxPackage(models.Model):
             if move.product_id.tracking == 'serial':
                 move.next_serial_count = move.product_uom_qty
         if not_available_list:
-            raise UserError(_('Stock not available %s', (", ".join(a for a in set(not_available_list)))))
+            raise UserError(_(' Lot %s added in uploaded file is not available in stock.', (", ".join(a for a in set(not_available_list)))))
 
         self.env['stock.move.line'].create(move_line_vals_list)
         partially_available_moves.write({'state': 'partially_available'})
@@ -581,7 +584,7 @@ class BoxPackage(models.Model):
                 if ext != 'xlsx':
                     raise ValidationError(_("The file must be a xlsx file"))
         else:
-            raise ValidationError(_("Please upload NFC tag and Lot information."))
+            raise ValidationError(_("Please upload NFC tag and Lot information file."))
 
     def unlink(self):
         for record in self:
@@ -612,3 +615,14 @@ class BoxPackageMove(models.Model):
     product_uom_category_id = fields.Many2one(related='product_id.uom_id.category_id')
     origin = fields.Char("Source Document")
     quantity_done = fields.Float('Quantity Done', digits='Product Unit of Measure')
+    forecast_availability = fields.Float('Forecast Availability', compute='_compute_forecast_information',
+                                         digits='Product Unit of Measure')
+
+    def _compute_forecast_information(self):
+        for record in self:
+            mo_obj = self.env['mrp.production'].search([('box_package_id', '=', record.raw_material_box_package_id.id)])
+            forecast_availability = 0
+            if mo_obj:
+                forecast_availability = sum([data.reserved_availability for data in mo_obj.mapped('move_raw_ids').filtered(lambda m: m.product_id.id == record.product_id.id)])
+            record.forecast_availability = forecast_availability
+
