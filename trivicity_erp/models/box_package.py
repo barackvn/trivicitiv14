@@ -290,7 +290,7 @@ class BoxPackage(models.Model):
         mo_obj = self.env['mrp.production'].search([('box_package_id', '=', self.id)])
         if mo_obj:
            for rec in mo_obj:
-               rec.update({'state':'cancel'})
+               rec.action_cancel()
         return self.write({'state': 'cancel'})
 
     def action_confirm(self):
