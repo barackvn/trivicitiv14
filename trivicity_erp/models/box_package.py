@@ -345,17 +345,23 @@ class BoxPackage(models.Model):
             list_keys = list(data.keys())
             unique_list = []
             mo_have_lot = mo_objs.mapped('lot_producing_id').mapped('name')
+            already_assigned = []
             for key_data in list_keys:
                 dup_found = self.env['stock.production.lot'].search([('name','=', key_data)])
                 if not dup_found or key_data in mo_have_lot:
                     unique_list.append(key_data)
+                else:
+                    already_assigned.append(key_data)
             for production in mo_objs:
                 if len(unique_list) > index:
                     lot_name = data.get(unique_list[index])
                     self._action_assign(production, lot_name)
                     index += 1
                 else:
-                    raise UserError(_('File lot is not enough Please upload another lots.'))
+                    note = ''
+                    if already_assigned:
+                        note = 'Already assigned these NFC tags: ' + ".\n".join(l for l in already_assigned)
+                    raise UserError(_('File lot is not enough Please upload another lots. %s', note))
             if self._context.get('assign_lot'):
                 index = 0
                 for production in mo_objs:
