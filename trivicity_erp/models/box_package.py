@@ -362,7 +362,7 @@ class BoxPackage(models.Model):
                     if len(list_keys) != len(mo_objs):
                         note = 'Found only ' + str(len(list_keys)) + ' NFC tags, but required ' + str(len(mo_objs)) + ' NFC tag information.\n'
                     if already_assigned:
-                        note = note + ",".join(l for l in already_assigned) + ' NFC tags are already assigned to existing box. Please verify uploaded information. '
+                        note = note + ", ".join(l for l in already_assigned) + ' NFC tags are already assigned to existing box. Please verify uploaded information. '
                     if note:
                         raise UserError(_(note))
             if self._context.get('assign_lot'):
