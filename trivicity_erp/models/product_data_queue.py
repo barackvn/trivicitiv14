@@ -15,5 +15,6 @@ class ShopifyProductDataQueue(models.Model):
         instance = self.env['shopify.instance.ept'].browse(instance_id)
 
         self.shopify_create_product_data_queue(instance)
-        self.env['shopify.product.data.queue.line.ept'].auto_import_product_queue_line_data()
+        if not ctx.get('is_auto_run_queue'):
+            self.env['shopify.product.data.queue.line.ept'].auto_import_product_queue_line_data()
         return
