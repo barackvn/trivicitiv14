@@ -41,7 +41,8 @@ class ShopifyProcessImportExport(models.TransientModel):
         if not customer_ids:
             _logger.info("Customers not found while the import customers from Shopify")
         else:
-            self.env['shopify.customer.data.queue.line.ept'].sync_shopify_customer_into_odoo()
+            if not ctx.get('is_auto_run_queue'):
+                self.env['shopify.customer.data.queue.line.ept'].sync_shopify_customer_into_odoo()
         return
 
     def create_customer_data_queues_cron(self, customer_data, instance):

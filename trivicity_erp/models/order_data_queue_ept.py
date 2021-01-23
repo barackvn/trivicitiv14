@@ -25,5 +25,6 @@ class ShopifyOrderDataQueueEpt(models.Model):
                                               order_type="shipped")
         self.shopify_create_order_data_queues(instance, from_date, to_date, created_by="scheduled_action",
                                               order_type="unshipped")
-        self.env['shopify.order.data.queue.line.ept'].auto_import_order_queue_data()
+        if not ctx.get('is_auto_run_queue'):
+            self.env['shopify.order.data.queue.line.ept'].auto_import_order_queue_data()
         return
