@@ -6,7 +6,7 @@
     'author': u'Silentinfotech Pvt. Ltd.',
     'website': '',
     # Dependencies
-    'depends': ['base', 'sale', 'account_asset', 'account_check_printing','mrp', 'shopify_ept'],
+    'depends': ['base', 'sale', 'account_asset', 'account_check_printing','mrp', 'mrp_workorder', 'shopify_ept'],
     
     # Views
     'init_xml': [],
