@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mrp_workcenter_view" model="ir.ui.view">
+        <field name="name">mrp.workcenter.form.inherit</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_workcenter_view"/>
+        <field name="arch" type="xml">
+            <field name="alternative_workcenter_ids" position="after">
+                <field name="user_ids" widget="many2many_tags"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="mrp.mrp_workcenter_kanban_action" model="ir.actions.act_window">
+        <field name="domain">[('user_ids', 'in', [uid])]</field>
+    </record>
+</odoo>

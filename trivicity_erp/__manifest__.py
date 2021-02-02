@@ -12,6 +12,7 @@
     'init_xml': [],
     'data': [
         'security/ir.model.access.csv',
+        # 'security/security.xml',
         'data/ir_sequence.xml',
         'data/ir_cron_data.xml',
         'view/crm_tag_view.xml',
@@ -21,7 +22,10 @@
         'view/account_payment_view.xml',
         'view/box_package_view.xml',
         'view/mrp_production_view.xml',
-        
+        'view/mrp_workcenter_view.xml',
+        'view/mrp_workorder_view.xml',
+        'view/stock_scrap_views.xml',
+
              ],
     'demo_xml': [],
     
