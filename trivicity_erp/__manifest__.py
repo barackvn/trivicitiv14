@@ -25,7 +25,8 @@
         'view/mrp_workcenter_view.xml',
         'view/mrp_workorder_view.xml',
         'view/stock_scrap_views.xml',
-
+        'view/stock_picking_view.xml',
+        
              ],
     'demo_xml': [],
     

@@ -11,3 +11,4 @@ from . import mrp_production
 from . import order_data_queue_ept
 from . import product_data_queue
 from . import process_import_export
+from . import stock_picking
