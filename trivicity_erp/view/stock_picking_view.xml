@@ -17,9 +17,9 @@
                             <field name="location_id"/>
                             <field name="lot_id" groups="stock.group_production_lot"
                                    invisible="context.get('hide_lot', False)"/>
-                            <field name="quantity" string="On Hand Quantity" invisible="1"/>
+                            <field name="quantity" string="On Hand Quantity" invisible="0"/>
                             <field name="inventory_quantity" string="On Hand Quantity" decoration-danger="inventory_quantity &lt; 0"
-                                   readonly="0"/>
+                                   invisible="1"/>
                             <field name="available_quantity"/>
                             <field name="product_uom_id" groups="uom.group_uom"/>
                             <field name='company_id' groups="base.group_multi_company" optional="show"/>
