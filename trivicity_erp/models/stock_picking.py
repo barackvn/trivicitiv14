@@ -4,7 +4,7 @@ import logging
 import json
 from datetime import datetime
 from dateutil import parser
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.float_utils import float_compare, float_is_zero, float_repr, float_round
 
 
@@ -25,13 +25,16 @@ class StockPicking(models.Model):
                 for product_id in product_ids:
                     quants1 = self.env['stock.quant']._gather(product_id, location_id)
                     quant_obj = self.env['stock.quant']
+                    product_qty = sum(record.move_ids_without_package.filtered(lambda p: p.product_id == product_id).mapped('product_uom_qty'))
+                    avail = 0
                     for quant in quants1:
                         if quant.available_quantity:
+                            avail += quant.available_quantity
                             quant_obj |= quant
-                            if len(quant_obj) == 5:
+                            if avail >= product_qty:
                                 quants |= quant_obj
                                 break
-                    if len(quant_obj) < 5:
+                    if avail < product_qty:
                         quants |= quant_obj
             record.fifo_inventory_quant_ids = quants
 
@@ -60,7 +63,7 @@ class StockPicking(models.Model):
                 else:
                     pass
             else:
-                raise ValueError(_('%s NFC Tag not exist for delivered product at %s location' % (barcode, self.location_id.name)))
+                raise ValidationError(_('%s NFC Tag not exist for delivered product at %s location' % (barcode, self.location_id.name)))
 
     def _update_reserved_quantity(self, move, need, stock_quant, location_id, lot_id=None, package_id=None, owner_id=None, strict=True):
         assigned_moves = self.env['stock.move']
