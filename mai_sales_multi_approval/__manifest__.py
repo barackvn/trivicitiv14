@@ -1,0 +1,26 @@
+{
+    'name': 'Sales multi level approval || Sales workflow approval',
+    'category': 'Sales',
+    'summary': 'Using this module you can Create multi level Approval.',
+    'description': """ Using this module you can Create multi level Approval. """,
+    'price': 7,
+    'version': '14.1.1.1',
+    'currency': 'EUR',
+    "author" : "MAISOLUTIONSLLC",
+    'sequence': 1,
+    "email": 'apps@maisolutionsllc.com',
+    "website":'http://maisolutionsllc.com/',
+    'license': 'LGPL-3',
+    'depends': ['sale_management'],
+    'data': [
+        'security/sale_security.xml',
+        'views/sale_workflow_view.xml',
+    ],
+    # "live_test_url" : "https://youtu.be/8ldxnykGlrs",
+    'demo': [],
+    'test': [],
+    'images': ['static/description/main_screenshot.png'],    
+    'installable': True,
+    'auto_install': False,
+}
+

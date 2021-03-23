@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mrp_workorder_view_form_tablet" model="ir.ui.view">
+        <field name="name">mrp.workorder.view.form.inherit.quality.tablet.new</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp_workorder.mrp_workorder_view_form_tablet"/>
+        <field name="arch" type="xml">
+            <button name="action_open_manufacturing_order" position="after">
+                <button name="action_manufacturing_order_with_scrap" type="object" string="Scrap" icon="fa-check" attrs="{'invisible': ['|', '|', '|', ('is_user_working', '=', False), ('is_last_step', '!=', True), ('skipped_check_ids', '!=', []), ('is_last_unfinished_wo', '=', False)]}" class="btn-primary" barcode_trigger="cloMO"/>
+            </button>
+        </field>
+    </record>
+
+    <record id="mrp_production_workorder_tree_editable_view" model="ir.ui.view">
+        <field name="name">mrp.production.work.order.tree.inherit.editable</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_tree_editable_view"/>
+        <field name="arch" type="xml">
+            <button name="button_start" position="before">
+                <field name="show_button" invisible="1"/>
+            </button>
+            <button name="button_start" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', '|', '|', ('production_state','in', ('draft', 'done')), ('working_state', '=', 'blocked'), ('state', '=', 'done'), ('is_user_working', '!=', False), ('show_button', '=', False)]}</attribute>
+            </button>
+            <button name="button_pending" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', '|', ('show_button', '=', False), ('production_state', 'in', ('draft', 'done')), ('working_state', '=', 'blocked'), ('is_user_working', '=', False)]}</attribute>
+            </button>
+            <button name="button_finish" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', '|', ('show_button', '=', False), ('production_state', 'in', ('draft', 'done')), ('working_state', '=', 'blocked'), ('is_user_working', '=', False)]}</attribute>
+            </button>
+            <button name="%(mrp.act_mrp_block_workcenter_wo)d" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', ('show_button', '=', False),  ('production_state', 'in', ('draft', 'done')), ('working_state', '=', 'blocked')]}</attribute>
+            </button>
+            <button name="button_unblock" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', ('show_button', '=', False), ('production_state', 'in', ('draft', 'done')), ('working_state', '!=', 'blocked')]}</attribute>
+            </button>
+            <button name="action_open_wizard" position="attributes">
+                <attribute name="attrs">{'invisible': [('show_button', '=', False)]}</attribute>
+            </button>
+            <button name="open_tablet_view" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', '|', ('show_button', '=', False), ('production_state', 'in', ('draft', 'cancel', 'done')), ('state', '=', 'done')]}</attribute>
+            </button>
+            <field name="json_popover" position="attributes">
+                <attribute name="attrs">{'invisible': ['|', ('show_json_popover', '=', False), ('show_button', '=', False)]}</attribute>
+            </field>
+        </field>
+    </record>
+</odoo>

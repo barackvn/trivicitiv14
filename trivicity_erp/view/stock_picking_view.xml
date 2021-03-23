@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+        <record id="stock_picking_view_form_inherit_trivicity" model="ir.ui.view">
+            <field name="name">stock.picking.form.inherit</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.view_picking_form"/>
+            <field name="arch" type="xml">
+                <field name="move_ids_without_package" position="after">
+                    <h5 attrs="{'invisible': ['|', ('picking_type_code', 'not in', ['outgoing', 'internal', 'incoming']), ('state', 'in', ['draft', 'cancel'])]}">Detailed Operations</h5>
+                    <field name="move_line_ids_without_package" attrs="{'readonly': ['|', ('state', '=', 'cancel'), '&amp;', ('state', '=', 'done'), ('is_locked', '=', True)], 'invisible': ['|', ('picking_type_code', 'not in', ['outgoing', 'internal']), ('state', 'in', ['draft', 'cancel'])]}" context="{'tree_view_ref': 'stock.view_stock_move_line_detailed_operation_tree', 'default_picking_id': id, 'default_location_id': location_id, 'default_location_dest_id': location_dest_id, 'default_company_id': company_id}"/>
+                    <field name="move_line_nosuggest_ids"
+                               attrs="{'readonly': ['|', ('state', '=', 'cancel'), '&amp;', ('state', '=', 'done'), ('is_locked', '=', True)], 'invisible': ['|', ('picking_type_code', '!=', 'incoming'), ('state', 'in', ['draft', 'cancel'])]}"
+                               context="{'tree_view_ref': 'stock.view_stock_move_line_detailed_operation_tree', 'default_picking_id': id, 'default_location_id': location_id, 'default_location_dest_id': location_dest_id, 'default_company_id': company_id}"/>
+                    <h5 attrs="{'invisible': ['|', ('state', 'in', ['draft', 'cancel', 'done']),('picking_type_code', 'not in', ['outgoing', 'internal'])]}">Fifo Inventory</h5>
+                    <field name="fifo_inventory_quant_ids" widget="one2many" attrs="{'invisible': ['|', ('picking_type_code', 'not in', ['outgoing', 'internal']), ('state', 'in', ['draft', 'cancel', 'done'])]}" >
+                        <tree>
+                            <field name="tracking" invisible="1"/>
+                            <field name="product_id"/>
+                            <field name="location_id"/>
+                            <field name="lot_id" groups="stock.group_production_lot"
+                                   invisible="context.get('hide_lot', False)"/>
+                            <field name="quantity" string="On Hand Quantity" invisible="0"/>
+                            <field name="inventory_quantity" string="On Hand Quantity" decoration-danger="inventory_quantity &lt; 0"
+                                   invisible="1"/>
+                            <field name="available_quantity"/>
+                            <field name="product_uom_id" groups="uom.group_uom"/>
+                            <field name='company_id' groups="base.group_multi_company" optional="show"/>
+                        </tree>
+                    </field>
+                </field>
+            </field>
+        </record>
+
+        <record id="stock_picking_view_form_inherit_stock_barcode_trivicity_erp" model="ir.ui.view">
+            <field name="name">stock.picking.form.inherit</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock_barcode.stock_picking_view_form_inherit_stock_barcode"/>
+            <field name="arch" type="xml">
+                <field name="origin" position="after">
+                    <field name="custom_barcode_scanned"  attrs="{'readonly': ['|', ('state', '=', 'cancel'), '&amp;', ('state', '=', 'done'), ('is_locked', '=', True)], 'invisible': ['|', ('picking_type_code', 'not in', ['outgoing', 'internal', 'incoming']), ('state', 'in', ['draft', 'cancel', 'done'])]}"/>
+                </field>
+            </field>
+        </record>
+
+        <record id="view_stock_move_line_detailed_operation_tree" model="ir.ui.view">
+            <field name="name">stock.move.line.operations.tree</field>
+            <field name="model">stock.move.line</field>
+            <field name="inherit_id" ref="stock.view_stock_move_line_detailed_operation_tree"/>
+            <field name="arch" type="xml">
+                <field name="move_id" position="after">
+                    <field name="temp_move_id" invisible="1"/>
+                </field>
+            </field>
+        </record>
+
+    </data>
+</odoo>

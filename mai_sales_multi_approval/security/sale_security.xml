@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record model="ir.module.category" id="module_sale_approval">
+        <field name="name">Sales multi level Approval Settings</field>
+        <field name="description">Category For Sale Approval</field>
+    </record>
+
+    <record id="sale_operation_send_approve" model ="res.groups">
+        <field name="name">Sale Operation Send Approval</field>
+        <field name="category_id" ref="module_sale_approval"/>
+    </record>
+
+    <record id="sale_headof_marketing_approve" model ="res.groups">
+        <field name="name">Head of Marketing Approval</field>
+        <field name="category_id" ref="module_sale_approval"/>
+    </record>
+
+    <record id="sale_headof_finance_approve" model ="res.groups">
+        <field name="name">Head of Finance Approval</field>
+        <field name="category_id" ref="module_sale_approval"/>
+    </record>
+
+    <record id="sale_coo_approve" model ="res.groups">
+        <field name="name">COO Approval</field>
+        <field name="category_id" ref="module_sale_approval"/>
+    </record>
+
+    <record id="sale_ceo_approve" model ="res.groups">
+        <field name="name">CEO Approval</field>
+        <field name="category_id" ref="module_sale_approval"/>
+    </record>
+
+</odoo>
