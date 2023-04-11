@@ -60,7 +60,7 @@ class ShopifyWebhookEpt(models.Model):
                 try:
                     webhook = shopify_webhook.find(record.webhook_id)
                     webhook.destroy()
-                    _logger.info("Delete %s webhook event" % record.webhook_action)
+                    _logger.info(f"Delete {record.webhook_action} webhook event")
                 except:
                     raise UserError("Something went wrong while deleting the webhook.")
         unlink_main = super(ShopifyWebhookEpt, self).unlink()
@@ -77,17 +77,23 @@ class ShopifyWebhookEpt(models.Model):
             result = any(elem in product_webhook for elem in all_webhook_action)
             if not result:
                 instance.write({'create_shopify_products_webhook': False})
-                _logger.info("Inactive create_shopify_products_webhook from the %s instance" % instance.name)
+                _logger.info(
+                    f"Inactive create_shopify_products_webhook from the {instance.name} instance"
+                )
         if instance.create_shopify_customers_webhook:
             result = any(elem in customer_webhook for elem in all_webhook_action)
             if not result:
                 instance.write({'create_shopify_customers_webhook': False})
-                _logger.info("Inactive create_shopify_customers_webhook from the %s instance" % instance.name)
+                _logger.info(
+                    f"Inactive create_shopify_customers_webhook from the {instance.name} instance"
+                )
         if instance.create_shopify_orders_webhook:
             result = any(elem in order_webhook for elem in all_webhook_action)
             if not result:
                 instance.write({'create_shopify_orders_webhook': False})
-                _logger.info("Inactive create_shopify_orders_webhook from the %s instance" % instance.name)
+                _logger.info(
+                    f"Inactive create_shopify_orders_webhook from the {instance.name} instance"
+                )
 
     @api.model
     def create(self, values):
@@ -95,10 +101,13 @@ class ShopifyWebhookEpt(models.Model):
         Create method for shopify.webhook.ept
         @author: Angel Patel@Emipro Technologies Pvt. Ltd.
         """
-        available_webhook = self.search(
-            [('instance_id', '=', values.get('instance_id')), ('webhook_action', '=', values.get('webhook_action'))],
-            limit=1)
-        if available_webhook:
+        if available_webhook := self.search(
+            [
+                ('instance_id', '=', values.get('instance_id')),
+                ('webhook_action', '=', values.get('webhook_action')),
+            ],
+            limit=1,
+        ):
             raise UserError(_('Webhook is already created with the same action.'))
 
         result = super(ShopifyWebhookEpt, self).create(values)
@@ -178,8 +187,7 @@ class ShopifyWebhookEpt(models.Model):
         if url[:url.find(":")] == 'http':
             raise UserError("Address protocol http:// is not supported for creating the webhooks.")
 
-        responses = shopify_webhook.find()
-        if responses:
+        if responses := shopify_webhook.find():
             for response in responses:
                 if response.topic == self.webhook_action:
                     self.write({"webhook_id": response.id, 'delivery_url': response.address,

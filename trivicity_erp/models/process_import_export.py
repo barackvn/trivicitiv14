@@ -27,11 +27,14 @@ class ShopifyProcessImportExport(models.TransientModel):
         customer_queues_ids = []
 
         instance.connect_in_shopify()
-        if not instance.shopify_last_date_customer_import:
-            customer_ids = shopify.Customer().find(limit=250)
-        else:
-            customer_ids = shopify.Customer().find(
-                updated_at_min=instance.shopify_last_date_customer_import, limit=250)
+        customer_ids = (
+            shopify.Customer().find(
+                updated_at_min=instance.shopify_last_date_customer_import,
+                limit=250,
+            )
+            if instance.shopify_last_date_customer_import
+            else shopify.Customer().find(limit=250)
+        )
         if customer_ids:
             customer_queues_ids = self.create_customer_data_queues_cron(customer_ids, instance)
             if len(customer_ids) == 250:
@@ -40,9 +43,8 @@ class ShopifyProcessImportExport(models.TransientModel):
             instance.shopify_last_date_customer_import = datetime.now()
         if not customer_ids:
             _logger.info("Customers not found while the import customers from Shopify")
-        else:
-            if not ctx.get('is_auto_run_queue'):
-                self.env['shopify.customer.data.queue.line.ept'].sync_shopify_customer_into_odoo()
+        elif not ctx.get('is_auto_run_queue'):
+            self.env['shopify.customer.data.queue.line.ept'].sync_shopify_customer_into_odoo()
         return
 
     def create_customer_data_queues_cron(self, customer_data, instance):
@@ -53,16 +55,16 @@ class ShopifyProcessImportExport(models.TransientModel):
         """
         customer_queue_list = []
         customer_data_queue_obj = self.env["shopify.customer.data.queue.ept"]
-        customer_data_queue_line_obj = self.env["shopify.customer.data.queue.line.ept"]
-        bus_bus_obj = self.env["bus.bus"]
-
         if len(customer_data) > 0:
+            customer_data_queue_line_obj = self.env["shopify.customer.data.queue.line.ept"]
+            bus_bus_obj = self.env["bus.bus"]
+
             for customer_id_chunk in split_every(125, customer_data):
                 customer_queue = customer_data_queue_obj.shopify_create_customer_queue(instance,
                                                                                        "import_process")
                 customer_data_queue_line_obj.shopify_create_multi_queue(customer_queue, customer_id_chunk)
 
-                message = "Customer Queue created {}".format(customer_queue.name)
+                message = f"Customer Queue created {customer_queue.name}"
                 bus_bus_obj.sendone((self._cr.dbname, "res.partner", self.env.user.partner_id.id),
                                     {"type": "simple_notification", "title": "Shopify Notification",
                                      "message": message, "sticky": False, "warning": True})
@@ -93,10 +95,13 @@ class ShopifyProcessImportExport(models.TransientModel):
                     try:
                         result = shopify.Customer().find(page_info=page_info, limit=250)
                     except ClientError as error:
-                        if hasattr(error, "response"):
-                            if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                                time.sleep(5)
-                                result = shopify.Customer().find(page_info=page_info, limit=250)
+                        if (
+                            hasattr(error, "response")
+                            and error.response.code == 429
+                            and error.response.msg == "Too Many Requests"
+                        ):
+                            time.sleep(5)
+                            result = shopify.Customer().find(page_info=page_info, limit=250)
                     except Exception as error:
                         raise UserError(error)
                     if result:

@@ -23,4 +23,3 @@ def post_init_hook(cr, registry):
     # todo: 更新当前所有 res.partner
     cr.execute("UPDATE res_partner set is_user = true, related_user_id = u.id "
                "from res_users u where res_partner.id = u.partner_id;")
-    pass

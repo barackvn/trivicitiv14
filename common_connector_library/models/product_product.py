@@ -23,10 +23,7 @@ class ProductProduct(models.Model):
         stock_rule = self.env['stock.rule'].search([('company_id', '=', self.env.company.id), ('action', '=', 'buy'),
                                                     ('location_id', 'in', customer_locations.ids),
                                                     ('route_id', 'in', route_ids.ids)])
-        if stock_rule:
-            self.is_drop_ship_product = True
-        else:
-            self.is_drop_ship_product = False
+        self.is_drop_ship_product = bool(stock_rule)
 
     def prepare_common_image_vals(self, vals):
         """
@@ -36,12 +33,13 @@ class ProductProduct(models.Model):
         @return:Dictionary
         @author: Maulik Barad on Date 17-Oct-2020.
         """
-        image_vals = {"sequence":0,
-                      "image":vals.get("image_1920", False),
-                      "name":self.name,
-                      "product_id":self.id,
-                      "template_id":self.product_tmpl_id.id}
-        return image_vals
+        return {
+            "sequence": 0,
+            "image": vals.get("image_1920", False),
+            "name": self.name,
+            "product_id": self.id,
+            "template_id": self.product_tmpl_id.id,
+        }
 
     @api.model
     def create(self, vals):
@@ -81,15 +79,9 @@ class ProductProduct(models.Model):
         actual_stock = getattr(product, stock_type)
         if actual_stock >= 1.00:
             if fix_stock_type == 'fix':
-                if fix_stock_value >= actual_stock:
-                    return actual_stock
-                return fix_stock_value
-
-            if fix_stock_type == 'percentage':
-                quantity = int((actual_stock * fix_stock_value) / 100.0)
-                if quantity >= actual_stock:
-                    return actual_stock
-                return quantity
+                return actual_stock if fix_stock_value >= actual_stock else fix_stock_value
+            elif fix_stock_type == 'percentage':
+                return min(int((actual_stock * fix_stock_value) / 100.0), actual_stock)
         return actual_stock
 
     def get_products_based_on_movement_date_ept(self, from_datetime, company=False):
@@ -151,8 +143,9 @@ class ProductProduct(models.Model):
         bom_product_ids = []
         module_obj = self.env['ir.module.module']
 
-        mrp_module = module_obj.sudo().search([('name', '=', 'mrp'), ('state', '=', 'installed')])
-        if mrp_module:
+        if mrp_module := module_obj.sudo().search(
+            [('name', '=', 'mrp'), ('state', '=', 'installed')]
+        ):
             qry = ("""select p.id as product_id from product_product as p
                         inner join mrp_bom as mb on mb.product_tmpl_id=p.product_tmpl_id
                         and p.id in (%s)""" % product_ids)
@@ -170,12 +163,14 @@ class ProductProduct(models.Model):
         @return: Prepared query in string.
         @author: Maulik Barad on Date 21-Oct-2020.
         """
-        query = """select pp.id as product_id,
+        return """select pp.id as product_id,
                 COALESCE(sum(sq.quantity)-sum(sq.reserved_quantity),0) as stock
                 from product_product pp
                 left join stock_quant sq on pp.id = sq.product_id and sq.location_id in (%s)
-                where pp.id in (%s) group by pp.id;""" % (location_ids, simple_product_list_ids)
-        return query
+                where pp.id in (%s) group by pp.id;""" % (
+            location_ids,
+            simple_product_list_ids,
+        )
 
     def prepare_forecasted_qty_query(self, location_ids, simple_product_list_ids):
         """
@@ -185,7 +180,7 @@ class ProductProduct(models.Model):
         @return: Prepared query in string.
         @author: Maulik Barad on Date 21-Oct-2020.
         """
-        query = ("""select * from (select pp.id as product_id,
+        return """select * from (select pp.id as product_id,
                 COALESCE(sum(sq.quantity)-sum(sq.reserved_quantity),0) as stock
                 from product_product pp
                 left join stock_quant sq on pp.id = sq.product_id and sq.location_id in (%s)
@@ -193,9 +188,12 @@ class ProductProduct(models.Model):
                 union all
                 select product_id as product_id, sum(product_qty) as stock from stock_move
                 where state in ('assigned') and product_id in (%s) and location_dest_id in (%s)
-                group by product_id) as test""" % (location_ids, simple_product_list_ids,
-                 simple_product_list_ids, location_ids))
-        return query
+                group by product_id) as test""" % (
+            location_ids,
+            simple_product_list_ids,
+            simple_product_list_ids,
+            location_ids,
+        )
 
     def get_free_qty_ept(self, warehouse, product_list):
         """
@@ -214,16 +212,17 @@ class ProductProduct(models.Model):
             bom_products = self.with_context(warehouse=warehouse.ids).browse(bom_product_ids)
             for product in bom_products:
                 actual_stock = getattr(product, 'free_qty')
-                qty_on_hand.update({product.id:actual_stock})
+                qty_on_hand[product.id] = actual_stock
 
         simple_product_list = list(set(product_list) - set(bom_product_ids))
-        simple_product_list_ids = ','.join(str(e) for e in simple_product_list)
-        if simple_product_list_ids:
+        if simple_product_list_ids := ','.join(
+            str(e) for e in simple_product_list
+        ):
             qry = self.prepare_free_qty_query(location_ids, simple_product_list_ids)
             self._cr.execute(qry)
             result = self._cr.dictfetchall()
             for i in result:
-                qty_on_hand.update({i.get('product_id'):i.get('stock')})
+                qty_on_hand[i.get('product_id')] = i.get('stock')
         return qty_on_hand
 
     def get_forecasted_qty_ept(self, warehouse, product_list):
@@ -243,14 +242,15 @@ class ProductProduct(models.Model):
             bom_products = self.with_context(warehouse=warehouse.ids).browse(bom_product_ids)
             for product in bom_products:
                 actual_stock = getattr(product, 'free_qty') + getattr(product, 'incoming_qty')
-                forcasted_qty.update({product.id:actual_stock})
+                forcasted_qty[product.id] = actual_stock
 
         simple_product_list = list(set(product_list) - set(bom_product_ids))
-        simple_product_list_ids = ','.join(str(e) for e in simple_product_list)
-        if simple_product_list_ids:
+        if simple_product_list_ids := ','.join(
+            str(e) for e in simple_product_list
+        ):
             qry = self.prepare_forecasted_qty_query(location_ids, simple_product_list_ids)
             self._cr.execute(qry)
             result = self._cr.dictfetchall()
             for i in result:
-                forcasted_qty.update({i.get('product_id'):i.get('stock')})
+                forcasted_qty[i.get('product_id')] = i.get('stock')
         return forcasted_qty

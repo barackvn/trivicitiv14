@@ -23,10 +23,18 @@ class AccountFiscalPosition(models.Model):
         @return:
         """
         origin_country_id = self._context.get('origin_country_ept', False)
-        if not origin_country_id:
-            return super(AccountFiscalPosition, self)._get_fpos_by_region(country_id=country_id, state_id=state_id,
-                                                                          zipcode=zipcode, vat_required=vat_required)
-        return self.search_fiscal_position_based_on_origin_country(origin_country_id, vat_required)
+        return (
+            self.search_fiscal_position_based_on_origin_country(
+                origin_country_id, vat_required
+            )
+            if origin_country_id
+            else super(AccountFiscalPosition, self)._get_fpos_by_region(
+                country_id=country_id,
+                state_id=state_id,
+                zipcode=zipcode,
+                vat_required=vat_required,
+            )
+        )
 
     @api.model
     def search_fiscal_position_based_on_origin_country(self, origin_country_id, vat_required):
@@ -39,16 +47,19 @@ class AccountFiscalPosition(models.Model):
                   ('origin_country_ept', '=', origin_country_id), ('origin_country_ept', '=', False)]
 
         _logger.info(self.env.company.id)
-        is_amazon_fpos = self._context.get('is_amazon_fpos', False)
-        if is_amazon_fpos:
+        if is_amazon_fpos := self._context.get('is_amazon_fpos', False):
             domain.append(('is_amazon_fpos', '=', is_amazon_fpos))
 
-        fiscal_position = self.search(domain + [('country_id', '=', origin_country_id)], limit=1)
-
-        if not fiscal_position:
-            fiscal_position = self.search(domain + [('country_group_id.country_ids', '=', origin_country_id)], limit=1)
-
-        if not fiscal_position:
-            fiscal_position = self.search(domain + [('country_id', '=', None), ('country_group_id', '=', None)],
-                                          limit=1)
-        return fiscal_position
+        return (
+            self.search(domain + [('country_id', '=', origin_country_id)], limit=1)
+            or self.search(
+                domain
+                + [('country_group_id.country_ids', '=', origin_country_id)],
+                limit=1,
+            )
+            or self.search(
+                domain
+                + [('country_id', '=', None), ('country_group_id', '=', None)],
+                limit=1,
+            )
+        )

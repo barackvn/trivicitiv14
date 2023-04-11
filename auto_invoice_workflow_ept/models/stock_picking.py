@@ -17,13 +17,12 @@ class StockPicking(models.Model):
             work_flow_process_record = picking.sale_id and picking.sale_id.auto_workflow_process_id
             if work_flow_process_record and picking.mapped('move_line_ids').filtered(
                     lambda l: l.product_id.invoice_policy == 'delivery') \
-                    and work_flow_process_record.create_invoice \
-                    and picking.picking_type_id.code == 'outgoing':
-                if work_flow_process_record.create_invoice:
-                    invoices = picking.sale_id._create_invoices()
-                    picking.sale_id.validate_invoice_ept(invoices)
-                    if work_flow_process_record.register_payment:
-                        picking.sale_id.paid_invoice_ept(invoices)
+                        and work_flow_process_record.create_invoice \
+                        and picking.picking_type_id.code == 'outgoing':
+                invoices = picking.sale_id._create_invoices()
+                picking.sale_id.validate_invoice_ept(invoices)
+                if work_flow_process_record.register_payment:
+                    picking.sale_id.paid_invoice_ept(invoices)
         return result
 
     def get_set_product(self, product):

@@ -73,8 +73,7 @@ class CommonLogLineEpt(models.Model):
                 'log_book_id': log_book_id.id if log_book_id else False,
                 "default_code": sku
                 }
-        log_line = self.create(vals)
-        return log_line
+        return self.create(vals)
 
     def shopify_create_order_log_line(self, message, model_id, queue_line_id, log_book_id, order_ref=""):
         """This method used to create a log line.
@@ -104,5 +103,4 @@ class CommonLogLineEpt(models.Model):
                 'shopify_customer_data_queue_line_id': queue_line_id and queue_line_id.id or False,
                 'log_book_id': log_book_id.id if log_book_id else False,
                 }
-        log_line = self.create(vals)
-        return log_line
+        return self.create(vals)

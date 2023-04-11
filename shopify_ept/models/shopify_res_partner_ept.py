@@ -31,13 +31,15 @@ class ShopifyResPartnerEpt(models.Model):
             common_log_line_obj.shopify_create_customer_log_line(message, model_id, queue_line, log_book)
             return False
 
-        name = "%s %s" % (first_name, last_name)
-        shopify_partner = self.search([("shopify_customer_id", "=", shopify_customer_id),
-                                       ("shopify_instance_id", "=", shopify_instance_id)], limit=1)
-        if shopify_partner:
-            partner = shopify_partner.partner_id
-            return partner
-
+        name = f"{first_name} {last_name}"
+        if shopify_partner := self.search(
+            [
+                ("shopify_customer_id", "=", shopify_customer_id),
+                ("shopify_instance_id", "=", shopify_instance_id),
+            ],
+            limit=1,
+        ):
+            return shopify_partner.partner_id
         shopify_partner_values = {"shopify_customer_id": shopify_customer_id,
                                   "shopify_instance_id": shopify_instance_id}
         if email:
@@ -45,7 +47,7 @@ class ShopifyResPartnerEpt(models.Model):
 
             if partner:
                 partner.write({"is_shopify_customer": True})
-                shopify_partner_values.update({"partner_id": partner.id})
+                shopify_partner_values["partner_id"] = partner.id
                 self.create(shopify_partner_values)
                 return partner
 
@@ -59,7 +61,7 @@ class ShopifyResPartnerEpt(models.Model):
         })
         partner = partner_obj.create(partner_vals)
 
-        shopify_partner_values.update({"partner_id": partner.id})
+        shopify_partner_values["partner_id"] = partner.id
         self.create(shopify_partner_values)
 
         return partner
@@ -113,7 +115,7 @@ class ShopifyResPartnerEpt(models.Model):
 
         first_name = vals.get("first_name")
         last_name = vals.get("last_name")
-        name = "%s %s" % (first_name, last_name)
+        name = f"{first_name} {last_name}"
 
         zipcode = vals.get("zip")
         state_name = vals.get("province")
@@ -126,7 +128,7 @@ class ShopifyResPartnerEpt(models.Model):
 
         state = partner_obj.create_or_update_state_ept(country_name, state_name, zipcode, country)
 
-        partner_vals = {
+        return {
             "email": vals.get("email") or False,
             "name": name,
             "phone": vals.get("phone"),
@@ -136,6 +138,5 @@ class ShopifyResPartnerEpt(models.Model):
             "zip": zipcode,
             "state_id": state and state.id or False,
             "country_id": country and country.id or False,
-            "is_company": False
+            "is_company": False,
         }
-        return partner_vals

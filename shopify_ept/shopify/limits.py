@@ -44,7 +44,7 @@ class Limits(object):
         """
         Have I reached my API call limit?
         """
-        return bool(cls.credit_left() <= 0)
+        return cls.credit_left() <= 0
 
     @classmethod
     def credit_limit(cls):

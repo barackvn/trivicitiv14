@@ -42,10 +42,12 @@ class ShopifyQueueProcessEpt(models.TransientModel):
         customer_queue_ids = self._context.get("active_ids")
 
         for customer_queue_id in customer_queue_ids:
-            synced_customer_queue_line_ids = customer_queue_line_obj.search(
-                [("synced_customer_queue_id", "=", customer_queue_id),
-                 ("state", "in", ["draft", "failed"])])
-            if synced_customer_queue_line_ids:
+            if synced_customer_queue_line_ids := customer_queue_line_obj.search(
+                [
+                    ("synced_customer_queue_id", "=", customer_queue_id),
+                    ("state", "in", ["draft", "failed"]),
+                ]
+            ):
                 synced_customer_queue_line_ids.process_customer_queue_lines()
 
     def process_order_queue_manually(self):

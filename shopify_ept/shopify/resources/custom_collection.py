@@ -12,6 +12,7 @@ class CustomCollection(ShopifyResource, mixins.Metafields, mixins.Events):
         return shopify.Collect.create({'collection_id': self.id, 'product_id': product.id})
 
     def remove_product(self, product):
-        collect = shopify.Collect.find_first(collection_id=self.id, product_id=product.id)
-        if collect:
+        if collect := shopify.Collect.find_first(
+            collection_id=self.id, product_id=product.id
+        ):
             collect.destroy()

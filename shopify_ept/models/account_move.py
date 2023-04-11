@@ -17,8 +17,11 @@ class AccountMove(models.Model):
             Task Id : 157911
         """
         view = self.env.ref('shopify_ept.view_shopify_refund_wizard')
-        context = dict(self._context)
-        context.update({'active_model': 'account.invoice', 'active_id': self.id, 'active_ids': self.ids})
+        context = dict(self._context) | {
+            'active_model': 'account.invoice',
+            'active_id': self.id,
+            'active_ids': self.ids,
+        }
         return {
             'name': _('Refund order In Shopify'),
             'type': 'ir.actions.act_window',

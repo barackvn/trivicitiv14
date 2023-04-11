@@ -13,5 +13,5 @@ def pre_init_check(cr):
     version_info = common.exp_version()
     server_serie = version_info.get('server_serie')
     if server_serie != '14.0':
-        raise Warning('Module support Odoo Version 14.0, found {}.'.format(server_serie))
+        raise Warning(f'Module support Odoo Version 14.0, found {server_serie}.')
     return True

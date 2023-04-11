@@ -89,8 +89,7 @@ class ShopifyOrderDataQueueEpt(models.Model):
             @param : self,vals
             @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 04/11/2019.
         """
-        sequence_id = self.env.ref('shopify_ept.seq_order_queue_data').ids
-        if sequence_id:
+        if sequence_id := self.env.ref('shopify_ept.seq_order_queue_data').ids:
             record_name = self.env['ir.sequence'].browse(sequence_id).next_by_id()
         else:
             record_name = '/'
@@ -169,7 +168,7 @@ class ShopifyOrderDataQueueEpt(models.Model):
         else:
             instance.last_shipped_order_import_date = to_date - timedelta(days=2)
         end = time.time()
-        _logger.info("Imported Orders in %s seconds." % (str(end - start)))
+        _logger.info(f"Imported Orders in {str(end - start)} seconds.")
         return order_queues
 
     def process_shopify_orders_directly(self, order_data, instance):
@@ -220,10 +219,13 @@ class ShopifyOrderDataQueueEpt(models.Model):
                     try:
                         result = shopify.Order().find(limit=250, page_info=page_info)
                     except ClientError as e:
-                        if hasattr(e, "response"):
-                            if e.response.code == 429 and e.response.msg == "Too Many Requests":
-                                time.sleep(5)
-                                result = shopify.Order().find(limit=250, page_info=page_info)
+                        if (
+                            hasattr(e, "response")
+                            and e.response.code == 429
+                            and e.response.msg == "Too Many Requests"
+                        ):
+                            time.sleep(5)
+                            result = shopify.Order().find(limit=250, page_info=page_info)
                     except Exception as e:
                         raise UserError(e)
                     if result and order_type == "shipped":
@@ -241,32 +243,32 @@ class ShopifyOrderDataQueueEpt(models.Model):
         :param order_ids: It contain the comma separated ids of shopify orders and its type is String
         :return: It will return either True or False
         """
-        sale_order_obj = self.env["sale.order"]
         common_log_book_obj = self.env["common.log.book.ept"]
 
         if order_ids:
             instance.connect_in_shopify()
             # Below one line is used to find only character values from order ids.
             re.findall("[a-zA-Z]+", order_ids)
-            if len(order_ids.split(',')) <= 50:
-                # order_ids_list is a list of all order ids which response did not given by shopify.
-                order_ids_list = list(set(re.findall(re.compile(r"(\d+)"), order_ids)))
-                results = shopify.Order().find(ids=','.join(order_ids_list), status='any')
-                if results:
-                    _logger.info('%s Shopify order(s) imported from instance : %s' % (
-                        len(results), instance.name))
-                    order_ids_list = [order_id.strip() for order_id in order_ids_list]
-                    # Below process to identify which id response did not give by Shopify.
-                    [order_ids_list.remove(str(result.id)) for result in results if str(result.id) in order_ids_list]
-            else:
+            if len(order_ids.split(',')) > 50:
                 raise UserError(_('Please enter the Order ids 50 or less'))
+            # order_ids_list is a list of all order ids which response did not given by shopify.
+            order_ids_list = list(set(re.findall(re.compile(r"(\d+)"), order_ids)))
+            results = shopify.Order().find(ids=','.join(order_ids_list), status='any')
+            if results:
+                _logger.info(
+                    f'{len(results)} Shopify order(s) imported from instance : {instance.name}'
+                )
+                order_ids_list = [order_id.strip() for order_id in order_ids_list]
+                # Below process to identify which id response did not give by Shopify.
+                [order_ids_list.remove(str(result.id)) for result in results if str(result.id) in order_ids_list]
             if results:
                 if order_ids_list:
-                    _logger.warning("Orders are not found for ids :%s" % (str(order_ids_list)))
+                    _logger.warning(f"Orders are not found for ids :{order_ids_list}")
                 model_id = common_log_book_obj.log_lines.get_model_id("sale.order")
                 log_book_id = common_log_book_obj.create({"type":"import",
                                                           "module":"shopify_ept",
                                                           "shopify_instance_id":instance.id,
                                                           "model_id":model_id})
+                sale_order_obj = self.env["sale.order"]
                 sale_order_obj.import_shopify_orders(results, log_book_id, is_queue_line=False)
         return True

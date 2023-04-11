@@ -19,7 +19,7 @@ class IrModelFields(models.Model):
         if self._context.get('section'):
             res = []
             for field in self:
-                name = '%s [%s]' % (field.field_description, field.name)
+                name = f'{field.field_description} [{field.name}]'
                 res.append((field.id, name))
             return res
         return super(IrModelFields, self).name_get()

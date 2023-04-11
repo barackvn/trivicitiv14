@@ -10,11 +10,11 @@ class IrAttachment(models.Model):
     _inherit = 'ir.attachment'
     @api.model
     def _index(self, bin_data, mimetype):
-        if self.res_model not in ['report.excel',]:
-            for ftype in FTYPES:
-                buf = getattr(self, '_index_%s' % ftype)(bin_data)
-                if buf:
-                    return buf
-            return super(IrAttachment, self)._index(bin_data, mimetype)
-        else:
+        if self.res_model in [
+            'report.excel',
+        ]:
             return
+        for ftype in FTYPES:
+            if buf := getattr(self, f'_index_{ftype}')(bin_data):
+                return buf
+        return super(IrAttachment, self)._index(bin_data, mimetype)

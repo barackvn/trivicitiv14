@@ -11,7 +11,7 @@ class Product(ShopifyResource, mixins.Metafields, mixins.Events):
         min_price = min(prices)
         max_price = max(prices)
         if min_price != max_price:
-            return "%s - %s" % (f % min_price, f % max_price)
+            return f"{f % min_price} - {f % max_price}"
         else:
             return f % min_price
 

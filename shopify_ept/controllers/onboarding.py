@@ -26,9 +26,9 @@ class ShopifyOnboarding(http.Controller):
         if not company:
             company = request.env.company
         if not request.env.is_admin() or \
-                company.shopify_onboarding_state == 'closed':
+                    company.shopify_onboarding_state == 'closed':
             return {}
-        hide_panel = True if company.shopify_onboarding_toggle_state != 'open' else False
+        hide_panel = company.shopify_onboarding_toggle_state != 'open'
         btn_value = 'Create More Shopify Instance' if hide_panel else 'Hide On boarding Panel'
         return {
             'html': request.env.ref('shopify_ept.shopify_instances_onboarding_panel_ept')._render({

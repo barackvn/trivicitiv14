@@ -18,11 +18,12 @@ class ProductTemplate(models.Model):
         @return:Dictionary
         @author: Maulik Barad on Date 17-Oct-2020.
         """
-        image_vals = {"sequence": 0,
-                      "image": vals.get("image_1920", False),
-                      "name": self.name,
-                      "template_id": self.id}
-        return image_vals
+        return {
+            "sequence": 0,
+            "image": vals.get("image_1920", False),
+            "name": self.name,
+            "template_id": self.id,
+        }
 
     @api.model
     def create(self, vals):

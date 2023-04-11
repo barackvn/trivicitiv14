@@ -18,10 +18,7 @@ class MrpWorkOrder(models.Model):
     @api.depends('workcenter_id')
     def compute_show_button(self):
         for rec in self:
-            if self.env.uid in rec.workcenter_id.user_ids.ids:
-                rec.show_button = True
-            else:
-                rec.show_button = False
+            rec.show_button = self.env.uid in rec.workcenter_id.user_ids.ids
 
     def read(self, fields=None, load='_classic_read'):
         return super(MrpWorkOrder, self.sudo()).read(fields, load)
@@ -40,4 +37,3 @@ class MrpWorkOrder(models.Model):
                         'product_ids': self.production_id.product_id.ids},
             'target': 'new',
         }
-        pass

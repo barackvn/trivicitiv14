@@ -13,11 +13,12 @@ class SaleOrder(models.Model):
         This method let the invoice date will be the same as the order date.
         """
         invoice_vals = super(SaleOrder, self)._prepare_invoice()
-        if self.auto_workflow_process_id:
-            #invoice_vals.update({'journal_id': self.auto_workflow_process_id.sale_journal_id.id})
-            if self.auto_workflow_process_id.invoice_date_is_order_date:
-                invoice_vals['date'] = self.date_order.date()
-                invoice_vals['invoice_date'] = fields.Date.context_today(self)
+        if (
+            self.auto_workflow_process_id
+            and self.auto_workflow_process_id.invoice_date_is_order_date
+        ):
+            invoice_vals['date'] = self.date_order.date()
+            invoice_vals['invoice_date'] = fields.Date.context_today(self)
         return invoice_vals
 
     def validate_order_ept(self):
@@ -133,9 +134,10 @@ class SaleOrder(models.Model):
             product_uom = order_line.product_uom
         if product and product_qty and product_uom:
             vals = {
-                'name': _('Auto processed move : %s') %
-                        (product.description_sale if product.description_sale
-                         else order_line.name),
+                'name': (
+                    _('Auto processed move : %s')
+                    % (product.description_sale or order_line.name)
+                ),
                 'company_id': self.company_id.id,
                 'product_id': product.id if product else False,
                 'product_uom_qty': product_qty,
@@ -143,10 +145,10 @@ class SaleOrder(models.Model):
                 'location_id': self.warehouse_id.lot_stock_id.id,
                 'location_dest_id': customers_location.id,
                 'state': 'confirmed',
-                'sale_line_id': order_line.id
+                'sale_line_id': order_line.id,
             }
             if bom_line:
-                vals.update({'bom_line_id': bom_line[0].id})
+                vals['bom_line_id'] = bom_line[0].id
             stock_move = self.env['stock.move'].create(vals)
             stock_move._action_assign()
             stock_move._set_quantity_done(product_qty)

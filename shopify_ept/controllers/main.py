@@ -20,7 +20,7 @@ class Main(http.Controller):
         if not res:
             return
 
-        _logger.info("PRODUCT WEBHOOK call for product: %s" % res.get("title"))
+        _logger.info(f'PRODUCT WEBHOOK call for product: {res.get("title")}')
 
         shopify_template = request.env["shopify.product.template.ept"].with_context(
             active_test=False).search([("shopify_tmpl_id", "=", res.get("id")),
@@ -43,11 +43,14 @@ class Main(http.Controller):
         if not res:
             return
 
-        _logger.info("DELETE PRODUCT WEBHOOK call for product: %s" % res.get("title"))
-        shopify_template = request.env["shopify.product.template.ept"].search(
-            [("shopify_tmpl_id", "=", res.get("id")),
-             ("shopify_instance_id", "=", instance.id)], limit=1)
-        if shopify_template:
+        _logger.info(f'DELETE PRODUCT WEBHOOK call for product: {res.get("title")}')
+        if shopify_template := request.env["shopify.product.template.ept"].search(
+            [
+                ("shopify_tmpl_id", "=", res.get("id")),
+                ("shopify_instance_id", "=", instance.id),
+            ],
+            limit=1,
+        ):
             shopify_template.write({"active": False})
         return
 
@@ -59,7 +62,8 @@ class Main(http.Controller):
             return
 
         _logger.info(
-            "CREATE CUSTOMER WEBHOOK call for Customer: %s" % (res.get("first_name") + " " + res.get("last_name")))
+            f'CREATE CUSTOMER WEBHOOK call for Customer: {res.get("first_name") + " " + res.get("last_name")}'
+        )
         self.customer_webhook_process(res, instance)
         return
 
@@ -74,7 +78,8 @@ class Main(http.Controller):
             return
 
         _logger.info(
-            "UPDATE CUSTOMER WEBHOOK call for Customer: %s" % (res.get("first_name") + " " + res.get("last_name")))
+            f'UPDATE CUSTOMER WEBHOOK call for Customer: {res.get("first_name") + " " + res.get("last_name")}'
+        )
         self.customer_webhook_process(res, instance)
         return
 
@@ -97,7 +102,7 @@ class Main(http.Controller):
         if not res:
             return
 
-        _logger.info("UPDATE ORDER WEBHOOK call for order: %s" % res.get("name"))
+        _logger.info(f'UPDATE ORDER WEBHOOK call for order: {res.get("name")}')
 
         fulfillment_status = res.get("fulfillment_status") or "unfulfilled"
         if request.env["sale.order"].sudo().search_read([("shopify_instance_id", "=", instance.id),
@@ -125,7 +130,7 @@ class Main(http.Controller):
             [("delivery_url", "ilike", route), ("instance_id", "=", instance.id)],
             limit=1)
 
-        if not instance.active or not webhook.state == "active":
+        if not instance.active or webhook.state != "active":
             _logger.info("The method is skipped. It appears the instance:%s is not active or that "
                          "the webhook %s is not active." % (instance.name, webhook.webhook_name))
             res = False

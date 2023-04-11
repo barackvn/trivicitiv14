@@ -6,15 +6,14 @@ import json
 class InventoryLevel(ShopifyResource):
 
     def __repr__(self):
-        return '%s(inventory_item_id=%s, location_id=%s)' % (self._singular, self.inventory_item_id, self.location_id)
+        return f'{self._singular}(inventory_item_id={self.inventory_item_id}, location_id={self.location_id})'
 
     @classmethod
     def _element_path(cls, prefix_options={}, query_options=None):
         if query_options is None:
             prefix_options, query_options = cls._split_options(prefix_options)
 
-        return "%s%s.%s%s" % (cls._prefix(prefix_options)+'/', cls.plural,
-                              cls.format.extension, cls._query_string(query_options))
+        return f"{cls._prefix(prefix_options)}/{cls.plural}.{cls.format.extension}{cls._query_string(query_options)}"
 
     @classmethod
     def adjust(cls, location_id, inventory_item_id, available_adjustment):

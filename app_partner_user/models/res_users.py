@@ -46,8 +46,7 @@ class User(models.Model):
     def unlink(self):
         # 自动删除关联伙伴
         for rec in self:
-            ids = []
-            ids.append(rec.partner_id.id)
+            ids = [rec.partner_id.id]
         res = super(User, self).unlink()
         try:
             self.env['res.partner'].browse(ids).unlink()
@@ -66,15 +65,15 @@ class User(models.Model):
             is_mrp = user.has_group('mrp.group_mrp_user')
             vals = {}
             if user.is_portal != is_portal:
-                vals.update({'is_portal': is_portal})
+                vals['is_portal'] = is_portal
             if user.is_account != is_account:
-                vals.update({'is_account': is_account})
+                vals['is_account'] = is_account
             if user.is_sale != is_sale:
-                vals.update({'is_sale': is_sale})
+                vals['is_sale'] = is_sale
             if user.is_purchase != is_purchase:
-                vals.update({'is_purchase': is_purchase})
+                vals['is_purchase'] = is_purchase
             if user.is_stock != is_stock:
-                vals.update({'is_stock': is_stock})
+                vals['is_stock'] = is_stock
             if user.is_mrp != is_mrp:
-                vals.update({'is_mrp': is_mrp})
+                vals['is_mrp'] = is_mrp
             user.update(vals)

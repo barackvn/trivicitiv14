@@ -31,6 +31,4 @@ class Collection(list):
         same_list = super(Collection, self).__eq__(other)
         if isinstance(other, Collection):
             return same_list and self.metadata == other.metadata
-        if isinstance(other, list):
-            return same_list
-        return False
+        return same_list if isinstance(other, list) else False

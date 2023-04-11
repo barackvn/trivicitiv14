@@ -37,7 +37,7 @@ class ShopifyPayoutReconciliationProcessLog(models.Model):
         if not self._context.get('is_closed'):
             note = 'Bank statement lines not created for Payout Transaction Reference : '
             for log_line in reconciliation_log_ids.filtered(lambda line: line.is_skipped):
-                note += str(log_line.payout_transaction_ref) + ' , '
+                note += f'{str(log_line.payout_transaction_ref)} , '
         else:
             note = reconciliation_log_ids[0].message
         if note:

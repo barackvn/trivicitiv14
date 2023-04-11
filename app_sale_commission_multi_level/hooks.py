@@ -23,9 +23,7 @@ def pre_init_hook(cr):
     """
     try:
         env = api.Environment(cr, SUPERUSER_ID, {})
-        # 找到主公司，更新sale team
-        c = env.ref('base.main_company')
-        if c:
+        if c := env.ref('base.main_company'):
             teams = env['crm.team'].sudo().search([
                         ('company_id', '=', False)
                     ])
@@ -33,23 +31,23 @@ def pre_init_hook(cr):
                 'company_id': c.id,
             })
 
-        # # 配置默认值
-        # vlist = [{
-        #     'key': 'app_sale_commission_multi_level.commission_rule_on',
-        #     'value': 'sales_team',
-        # }, {
-        #     'key': 'app_sale_commission_multi_level.commission_amount_on',
-        #     'value': 'amount_untaxed',
-        # }, {
-        #     'key': 'app_sale_commission_multi_level.default_commission_invoice_policy',
-        #     'value': 'order',
-        # }]
-        # for v in vlist:
-        #     p = env['ir.config_parameter'].sudo().search([('key', 'like', v['key'])])
-        #     if p:
-        #         p.write(v)
-        #     else:
-        #         p.create(v)
+            # # 配置默认值
+            # vlist = [{
+            #     'key': 'app_sale_commission_multi_level.commission_rule_on',
+            #     'value': 'sales_team',
+            # }, {
+            #     'key': 'app_sale_commission_multi_level.commission_amount_on',
+            #     'value': 'amount_untaxed',
+            # }, {
+            #     'key': 'app_sale_commission_multi_level.default_commission_invoice_policy',
+            #     'value': 'order',
+            # }]
+            # for v in vlist:
+            #     p = env['ir.config_parameter'].sudo().search([('key', 'like', v['key'])])
+            #     if p:
+            #         p.write(v)
+            #     else:
+            #         p.create(v)
     except Exception as e:
         pass
 

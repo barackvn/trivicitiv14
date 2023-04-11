@@ -29,11 +29,12 @@ class ProductImageEpt(models.Model):
                        "image/vnd.microsoft.icon", "image/x-icon",
                        "image/vnd.djvu", "image/svg+xml", "image/gif"]
         response = requests.get(url, stream=True, verify=False, timeout=10)
-        if response.status_code == 200:
-            if response.headers["Content-Type"] in image_types:
-                image = base64.b64encode(response.content)
-                if image:
-                    return image
+        if (
+            response.status_code == 200
+            and response.headers["Content-Type"] in image_types
+        ):
+            if image := base64.b64encode(response.content):
+                return image
         raise UserError(_("Can't find image.\nPlease provide valid Image URL."))
 
     @api.model
@@ -50,6 +51,6 @@ class ProductImageEpt(models.Model):
 
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         rec_id = str(record.id)
-        url = base_url + '/lf/i/%s' % (base64.urlsafe_b64encode(rec_id.encode("utf-8")).decode("utf-8"))
+        url = f'{base_url}/lf/i/{base64.urlsafe_b64encode(rec_id.encode("utf-8")).decode("utf-8")}'
         record.write({'url':url})
         return record

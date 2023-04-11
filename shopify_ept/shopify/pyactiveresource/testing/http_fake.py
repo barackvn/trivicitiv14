@@ -112,14 +112,13 @@ class TestHandler(urllib.request.HTTPHandler, urllib.request.HTTPSHandler):
         if self._response_map:
             key = create_response_key(
                 request.get_method(), request.get_full_url(), request.headers)
-            if str(key) in self._response_map:
-                (code, body, response_headers) = self._response_map[str(key)]
-                return FakeResponse(code, body, response_headers)
-            else:
+            if str(key) not in self._response_map:
                 raise Error('Unknown request %s %s'
                             '\nrequest:%s\nresponse_map:%s' % (
                             request.get_method(), request.get_full_url(),
                             str(key), pformat(list(self._response_map.keys()))))
+            (code, body, response_headers) = self._response_map[str(key)]
+            return FakeResponse(code, body, response_headers)
         elif isinstance(self._response, Exception):
             raise(self._response)
         else:

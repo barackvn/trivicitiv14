@@ -58,13 +58,19 @@ class ShopifyPaymentGateway(models.Model):
         @param gateway_name: Payment gateway name.
         @author: Maulik Barad on Date 30-Sep-2020.
         """
-        shopify_payment_gateway = self.search([('code', '=', gateway_name),
-                                               ('shopify_instance_id', '=', instance.id)], limit=1)
-        if not shopify_payment_gateway:
-            shopify_payment_gateway = self.create({'name': gateway_name,
-                                                   'code': gateway_name,
-                                                   'shopify_instance_id': instance.id})
-        return shopify_payment_gateway
+        return self.search(
+            [
+                ('code', '=', gateway_name),
+                ('shopify_instance_id', '=', instance.id),
+            ],
+            limit=1,
+        ) or self.create(
+            {
+                'name': gateway_name,
+                'code': gateway_name,
+                'shopify_instance_id': instance.id,
+            }
+        )
 
     def shopify_search_create_gateway_workflow(self, instance, order_data_queue_line,
                                                order_response, log_book_id):

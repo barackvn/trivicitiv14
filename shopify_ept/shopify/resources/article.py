@@ -8,9 +8,8 @@ class Article(ShopifyResource, mixins.Metafields, mixins.Events):
 
     @classmethod
     def _prefix(cls, options={}):
-        blog_id = options.get("blog_id")
-        if blog_id:
-            return "%s/blogs/%s" % (cls.site, blog_id)
+        if blog_id := options.get("blog_id"):
+            return f"{cls.site}/blogs/{blog_id}"
         else:
             return cls.site
 

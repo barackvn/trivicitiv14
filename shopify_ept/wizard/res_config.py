@@ -39,7 +39,7 @@ class ShopifyInstanceConfig(models.TransientModel):
         if not currency_id:
             currency_id = self.env.user.currency_id
 
-        price_list_name = self.name + " " + "PriceList"
+        price_list_name = f"{self.name} PriceList"
         pricelist = pricelist_obj.search([("name", "=", price_list_name),
                                           ("currency_id", "=", currency_id.id),
                                           ("company_id", "=", self.shopify_company_id.id)],
@@ -64,21 +64,23 @@ class ShopifyInstanceConfig(models.TransientModel):
         financial_status_obj = self.env["sale.auto.workflow.configuration.ept"]
         warehouse_obj = self.env['stock.warehouse']
 
-        instance_id = instance_obj.with_context(active_test=False).search(
-            ["|", ("shopify_api_key", "=", self.shopify_api_key),
-             ("shopify_host", "=", self.shopify_host)], limit=1)
-        if instance_id:
+        if instance_id := instance_obj.with_context(active_test=False).search(
+            [
+                "|",
+                ("shopify_api_key", "=", self.shopify_api_key),
+                ("shopify_host", "=", self.shopify_host),
+            ],
+            limit=1,
+        ):
             raise UserError(
                 "An instance already exists for the given details \nShopify API key : '%s' \nShopify Host : '%s'" % (
                     self.shopify_api_key, self.shopify_host))
 
         shop = self.shopify_host.split("//")
         if len(shop) == 2:
-            shop_url = shop[0] + "//" + self.shopify_api_key + ":" + self.shopify_password + "@" + \
-                       shop[1] + "/admin/api/2020-07"
+            shop_url = f"{shop[0]}//{self.shopify_api_key}:{self.shopify_password}@{shop[1]}/admin/api/2020-07"
         else:
-            shop_url = "https://" + self.shopify_api_key + ":" + self.shopify_password + "@" + shop[
-                0] + "/admin/api/2020-07"
+            shop_url = f"https://{self.shopify_api_key}:{self.shopify_password}@{shop[0]}/admin/api/2020-07"
         shopify.ShopifyResource.set_site(shop_url)
         try:
             shop_id = shopify.Shop.current()
@@ -129,8 +131,7 @@ class ShopifyInstanceConfig(models.TransientModel):
         """ Called by onboarding panel above the Instance."""
         action = self.env["ir.actions.actions"]._for_xml_id("shopify_ept.res_config_action_shopify_instance")
         action['context'] = {'is_calling_from_onboarding_panel': True}
-        instance = self.env['shopify.instance.ept'].search_shopify_instance()
-        if instance:
+        if instance := self.env['shopify.instance.ept'].search_shopify_instance():
             action.get('context').update({
                 'default_name': instance.name,
                 'default_shopify_host': instance.shopify_host,
@@ -258,8 +259,7 @@ class ResConfigSettings(models.TransientModel):
 
     @api.onchange("shopify_instance_id")
     def onchange_shopify_instance_id(self):
-        instance = self.shopify_instance_id or False
-        if instance:
+        if instance := self.shopify_instance_id or False:
             self.shopify_company_id = instance.shopify_company_id and instance.shopify_company_id.id or False
             self.shopify_warehouse_id = instance.shopify_warehouse_id and instance.shopify_warehouse_id or False
             self.auto_import_product = instance.auto_import_product or False
@@ -271,9 +271,9 @@ class ResConfigSettings(models.TransientModel):
             self.shopify_is_use_default_sequence = instance.is_use_default_sequence
             self.shopify_apply_tax_in_order = instance.apply_tax_in_order
             self.shopify_invoice_tax_account_id = instance.invoice_tax_account_id and \
-                                                  instance.invoice_tax_account_id.id or False
+                                                      instance.invoice_tax_account_id.id or False
             self.shopify_credit_tax_account_id = instance.credit_tax_account_id and \
-                                                 instance.credit_tax_account_id.id or False
+                                                     instance.credit_tax_account_id.id or False
             self.shopify_notify_customer = instance.notify_customer
             self.shopify_user_ids = instance.shopify_user_ids or False
             self.shopify_activity_type_id = instance.shopify_activity_type_id or False
@@ -298,41 +298,54 @@ class ResConfigSettings(models.TransientModel):
             @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 04/10/2019.
         """
         instance = self.shopify_instance_id
-        values = {}
         res = super(ResConfigSettings, self).execute()
         if instance:
-            # values["shopify_company_id"] = self.shopify_company_id and self.shopify_company_id.id or False
-            values["shopify_warehouse_id"] = self.shopify_warehouse_id and self.shopify_warehouse_id.id or False
-            values["auto_import_product"] = self.auto_import_product or False
-            values["shopify_sync_product_with"] = self.shopify_sync_product_with
-            values["shopify_pricelist_id"] = self.shopify_pricelist_id and self.shopify_pricelist_id.id or False
-            values["shopify_stock_field"] = self.shopify_stock_field and self.shopify_stock_field.id or False
-            values["shopify_section_id"] = self.shopify_section_id and self.shopify_section_id.id or False
-            values["shopify_order_prefix"] = self.shopify_order_prefix
-            values["is_use_default_sequence"] = self.shopify_is_use_default_sequence
-            values["apply_tax_in_order"] = self.shopify_apply_tax_in_order
-            values["invoice_tax_account_id"] = self.shopify_invoice_tax_account_id and \
-                                               self.shopify_invoice_tax_account_id.id or False
-            values["credit_tax_account_id"] = self.shopify_credit_tax_account_id and \
-                                              self.shopify_credit_tax_account_id.id or False
-            values["notify_customer"] = self.shopify_notify_customer
-            values["shopify_activity_type_id"] = self.shopify_activity_type_id and self.shopify_activity_type_id.id \
-                                                 or False
-            values["shopify_date_deadline"] = self.shopify_date_deadline or False
-            values.update({"shopify_user_ids": [(6, 0, self.shopify_user_ids.ids)]})
-            values["is_shopify_create_schedule"] = self.is_shopify_create_schedule
-            values["sync_product_with_images"] = self.shopify_sync_product_with_images or False
-            values["create_shopify_products_webhook"] = self.create_shopify_products_webhook
-            values["create_shopify_customers_webhook"] = self.create_shopify_customers_webhook
-            values["create_shopify_orders_webhook"] = self.create_shopify_orders_webhook
-            values["shopify_default_pos_customer_id"] = self.shopify_default_pos_customer_id.id
-            values["last_date_order_import"] = self.last_date_order_import
-            values["shopify_last_date_customer_import"] = self.shopify_last_date_customer_import
-            values["shopify_last_date_update_stock"] = self.shopify_last_date_update_stock
-            values["shopify_last_date_product_import"] = self.shopify_last_date_product_import
-            values["payout_last_import_date"] = self.shopify_payout_last_date_import or False
-            values["shopify_settlement_report_journal_id"] = self.shopify_settlement_report_journal_id or False
-
+            values = {
+                "shopify_warehouse_id": self.shopify_warehouse_id
+                and self.shopify_warehouse_id.id
+                or False,
+                "auto_import_product": self.auto_import_product or False,
+                "shopify_sync_product_with": self.shopify_sync_product_with,
+                "shopify_pricelist_id": self.shopify_pricelist_id
+                and self.shopify_pricelist_id.id
+                or False,
+                "shopify_stock_field": self.shopify_stock_field
+                and self.shopify_stock_field.id
+                or False,
+                "shopify_section_id": self.shopify_section_id
+                and self.shopify_section_id.id
+                or False,
+                "shopify_order_prefix": self.shopify_order_prefix,
+                "is_use_default_sequence": self.shopify_is_use_default_sequence,
+                "apply_tax_in_order": self.shopify_apply_tax_in_order,
+                "invoice_tax_account_id": self.shopify_invoice_tax_account_id
+                and self.shopify_invoice_tax_account_id.id
+                or False,
+                "credit_tax_account_id": self.shopify_credit_tax_account_id
+                and self.shopify_credit_tax_account_id.id
+                or False,
+                "notify_customer": self.shopify_notify_customer,
+                "shopify_activity_type_id": self.shopify_activity_type_id
+                and self.shopify_activity_type_id.id
+                or False,
+                "shopify_date_deadline": self.shopify_date_deadline or False,
+                "shopify_user_ids": [(6, 0, self.shopify_user_ids.ids)],
+                "is_shopify_create_schedule": self.is_shopify_create_schedule,
+                "sync_product_with_images": self.shopify_sync_product_with_images
+                or False,
+                "create_shopify_products_webhook": self.create_shopify_products_webhook,
+                "create_shopify_customers_webhook": self.create_shopify_customers_webhook,
+                "create_shopify_orders_webhook": self.create_shopify_orders_webhook,
+                "shopify_default_pos_customer_id": self.shopify_default_pos_customer_id.id,
+                "last_date_order_import": self.last_date_order_import,
+                "shopify_last_date_customer_import": self.shopify_last_date_customer_import,
+                "shopify_last_date_update_stock": self.shopify_last_date_update_stock,
+                "shopify_last_date_product_import": self.shopify_last_date_product_import,
+                "payout_last_import_date": self.shopify_payout_last_date_import
+                or False,
+                "shopify_settlement_report_journal_id": self.shopify_settlement_report_journal_id
+                or False,
+            }
             product_webhook_changed = customer_webhook_changed = order_webhook_changed = False
             if instance.create_shopify_products_webhook != self.create_shopify_products_webhook:
                 product_webhook_changed = True
@@ -390,8 +403,7 @@ class ResConfigSettings(models.TransientModel):
             "shopify_ept.action_shopify_instance_config")
         action_data = {'view_id': view_id.id, 'views': [(view_id.id, 'form')], 'target': 'new',
                        'name': 'Configurations'}
-        instance = self.env['shopify.instance.ept'].search_shopify_instance()
-        if instance:
+        if instance := self.env['shopify.instance.ept'].search_shopify_instance():
             action['context'] = {'default_shopify_instance_id': instance.id}
         else:
             action['context'] = {}
@@ -405,8 +417,7 @@ class ResConfigSettings(models.TransientModel):
            @author: Dipak Gogiya
            :return: True
         """
-        instance = self.shopify_instance_id
-        if instance:
+        if instance := self.shopify_instance_id:
             basic_configuration_dict = {
                 'shopify_company_id': self.shopify_company_id and self.shopify_company_id.id or False,
                 'shopify_warehouse_id': self.shopify_warehouse_id and self.shopify_warehouse_id.id or False,
@@ -437,8 +448,7 @@ class ResConfigSettings(models.TransientModel):
             @author: Dipak Gogiya, 22/09/2020
             :return: True
         """
-        instance = self.shopify_instance_id
-        if instance:
+        if instance := self.shopify_instance_id:
             product_webhook_changed = customer_webhook_changed = order_webhook_changed = False
             if instance.create_shopify_products_webhook != self.create_shopify_products_webhook:
                 product_webhook_changed = True

@@ -55,7 +55,7 @@ class SaleCommissionLevel(models.Model):
     def _compute_complete_name(self):
         for rec in self:
             if rec.parent_id:
-                rec.complete_name = '%s / %s' % (rec.parent_id.complete_name, rec.name)
+                rec.complete_name = f'{rec.parent_id.complete_name} / {rec.name}'
             else:
                 rec.complete_name = rec.name
 

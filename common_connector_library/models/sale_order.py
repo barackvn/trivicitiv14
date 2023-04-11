@@ -115,14 +115,13 @@ class SaleOrder(models.Model):
         """
         stock_move_obj = self.env['stock.move']
         move_ids = stock_move_obj.search([('picking_id', '=', False), ('sale_line_id', 'in', self.order_line.ids)]).ids
-        action = {
-            'domain':"[('id', 'in', " + str(move_ids) + " )]",
-            'name':'Order Stock Move',
-            'view_mode':'tree,form',
-            'res_model':'stock.move',
-            'type':'ir.actions.act_window',
+        return {
+            'domain': f"[('id', 'in', {str(move_ids)} )]",
+            'name': 'Order Stock Move',
+            'view_mode': 'tree,form',
+            'res_model': 'stock.move',
+            'type': 'ir.actions.act_window',
         }
-        return action
 
     def _prepare_invoice(self):
         """
@@ -209,10 +208,10 @@ class SaleOrder(models.Model):
         for invoice in invoices:
             if invoice.amount_residual:
                 vals = invoice.prepare_payment_dict(self.auto_workflow_process_id)
-                if invoice.amount_residual:
-                    payment_id = account_payment_obj.create(vals)
-                    payment_id.action_post()
-                    self.reconcile_payment_ept(payment_id, invoice)
+            if invoice.amount_residual:
+                payment_id = account_payment_obj.create(vals)
+                payment_id.action_post()
+                self.reconcile_payment_ept(payment_id, invoice)
         return True
 
     def reconcile_payment_ept(self, payment_id, invoice):
@@ -288,19 +287,21 @@ class SaleOrder(models.Model):
 
         if product and product_qty and product_uom:
             vals = {
-            'name': _('Auto processed move : %s') % (product.description_sale if product.description_sale else
-                                                     order_line.name),
-            'company_id': self.company_id.id,
-            'product_id': product.id if product else False,
-            'product_uom_qty': product_qty,
-            'product_uom': product_uom.id if product_uom else False,
-            'location_id': self.warehouse_id.lot_stock_id.id,
-            'location_dest_id': customers_location.id,
-            'state': 'confirmed',
-            'sale_line_id': order_line.id
+                'name': (
+                    _('Auto processed move : %s')
+                    % (product.description_sale or order_line.name)
+                ),
+                'company_id': self.company_id.id,
+                'product_id': product.id if product else False,
+                'product_uom_qty': product_qty,
+                'product_uom': product_uom.id if product_uom else False,
+                'location_id': self.warehouse_id.lot_stock_id.id,
+                'location_dest_id': customers_location.id,
+                'state': 'confirmed',
+                'sale_line_id': order_line.id,
             }
             if bom_line:
-                vals.update({'bom_line_id':bom_line[0].id})
+                vals['bom_line_id'] = bom_line[0].id
             stock_move = self.env['stock.move'].create(vals)
             stock_move._action_assign()
             stock_move._set_quantity_done(product_qty)

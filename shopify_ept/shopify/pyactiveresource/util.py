@@ -227,11 +227,11 @@ def to_query(query_params):
         annotated = {}
         for key, value in six.iteritems(params):
             if isinstance(value, list):
-                key = '%s[]' % key
+                key = f'{key}[]'
             elif isinstance(value, dict):
                 dict_options = {}
                 for dk, dv in six.iteritems(value):
-                    dict_options['%s[%s]' % (key, dk)] = dv
+                    dict_options[f'{key}[{dk}]'] = dv
                 annotated.update(annotate_params(dict_options))
                 continue
             elif isinstance(value, six.text_type):
@@ -254,17 +254,13 @@ def xml_pretty_format(element, level=0):
     indent = '\n%s' % ('  ' * level)
     if len(element):
         if not element.text or not element.text.strip():
-            element.text = indent + '  '
+            element.text = f'{indent}  '
         for i, child in enumerate(element):
             xml_pretty_format(child, level + 1)
             if not child.tail or not child.tail.strip():
-                if i + 1 < len(element):
-                    child.tail = indent + "  "
-                else:
-                    child.tail = indent
-    else:
-        if level and (not element.tail or not element.tail.strip()):
-            element.tail = indent
+                child.tail = f"{indent}  " if i + 1 < len(element) else indent
+    elif level and (not element.tail or not element.tail.strip()):
+        element.tail = indent
 
 
 def serialize(value, element):
@@ -346,9 +342,7 @@ def to_xml(obj, root='object', pretty=False, header=True, dasherize=True):
     if pretty:
         xml_pretty_format(root_element)
     xml_data = ET.tostring(root_element)
-    if header:
-        return XML_HEADER + xml_data
-    return xml_data
+    return XML_HEADER + xml_data if header else xml_data
 
 
 def xml_to_dict(xmlobj, saveroot=True):
@@ -367,7 +361,7 @@ def xml_to_dict(xmlobj, saveroot=True):
         try:
             element = ET.fromstring(xmlobj)
         except Exception as err:
-            raise Error('Unable to parse xml data: %s' % err)
+            raise Error(f'Unable to parse xml data: {err}')
     else:
         element = xmlobj
 
@@ -393,17 +387,16 @@ def xml_to_dict(xmlobj, saveroot=True):
     elif element_type == 'datetime':
         if date_parse:
             return date_parse(element.text)
-        else:
-            try:
-                timestamp = calendar.timegm(
-                        time.strptime(element.text, '%Y-%m-%dT%H:%M:%S+0000'))
+        try:
+            timestamp = calendar.timegm(
+                    time.strptime(element.text, '%Y-%m-%dT%H:%M:%S+0000'))
 
-                return datetime.datetime.utcfromtimestamp(timestamp)
-            except ValueError as err:
-                raise Error('Unable to parse timestamp. Install dateutil'
-                            ' (http://labix.org/python-dateutil) or'
-                            ' pyxml (http://pyxml.sf.net/topics/)'
-                            ' for ISO8601 support.')
+            return datetime.datetime.utcfromtimestamp(timestamp)
+        except ValueError as err:
+            raise Error('Unable to parse timestamp. Install dateutil'
+                        ' (http://labix.org/python-dateutil) or'
+                        ' pyxml (http://pyxml.sf.net/topics/)'
+                        ' for ISO8601 support.')
     elif element_type == 'date':
         time_tuple = time.strptime(element.text, '%Y-%m-%d')
         return datetime.date(*time_tuple[:3])
@@ -412,9 +405,7 @@ def xml_to_dict(xmlobj, saveroot=True):
     elif element_type in ('float', 'double'):
         return float(element.text)
     elif element_type == 'boolean':
-        if not element.text:
-            return False
-        return element.text.strip() in ('true', '1')
+        return element.text.strip() in ('true', '1') if element.text else False
     elif element_type == 'yaml':
         if not yaml:
             raise ImportError('PyYaml is not installed: http://pyyaml.org/')
@@ -427,9 +418,7 @@ def xml_to_dict(xmlobj, saveroot=True):
         filename = element.get('name', 'untitled')
         return FileObject(element.text, filename, content_type)
     elif element_type in ('symbol', 'string'):
-        if not element.text:
-            return ''
-        return element.text
+        return element.text or ''
     elif element.getchildren():
         # This is an element with children. The children might be simple
         # values, or nested hashes.
@@ -451,10 +440,7 @@ def xml_to_dict(xmlobj, saveroot=True):
                                              attribute]
             else:
                 attributes[child_tag] = attribute
-        if saveroot:
-            return {element.tag.replace('-', '_'): attributes}
-        else:
-            return attributes
+        return {element.tag.replace('-', '_'): attributes} if saveroot else attributes
     elif element.items():
         return element_containers.ElementDict(element.tag.replace('-', '_'),
                                               element.items())

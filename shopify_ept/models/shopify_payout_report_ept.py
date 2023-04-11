@@ -51,10 +51,9 @@ class ShopifyPaymentReportEpt(models.Model):
         Task ID : 164126
         """
         if self.payout_transaction_ids:
-            if any(line.is_remaining_statement for line in self.payout_transaction_ids):
-                all_statement_processed = False
-            else:
-                all_statement_processed = True
+            all_statement_processed = not any(
+                line.is_remaining_statement for line in self.payout_transaction_ids
+            )
         return all_statement_processed
 
     def generate_remaining_bank_statement(self):
@@ -133,23 +132,21 @@ class ShopifyPaymentReportEpt(models.Model):
         journal = self.instance_id.shopify_settlement_report_journal_id
         if not journal:
             message_body = "You have not configured Payout report Journal in " \
-                           "Instance.\nPlease configured it from Setting"
-            if self._context.get('is_cron'):
-                self.message_post(body=_(message_body))
-                self.is_skip_from_cron = True
-                return False
-            else:
+                               "Instance.\nPlease configured it from Setting"
+            if not self._context.get('is_cron'):
                 raise UserError(_(message_body))
 
+            self.message_post(body=_(message_body))
+            self.is_skip_from_cron = True
+            return False
         currency_id = journal.currency_id.id or self.instance_id.shopify_company_id.currency_id.id or False
         if currency_id != self.currency_id.id:
             message_body = "Report currency and Currency in Instance Journal are different.\nMake sure Report currency and Instance Journal currency must be same."
             self.message_post(body=_(message_body))
 
-        bank_statement_exist = bank_statement_obj.search([('shopify_payout_ref', '=', self.payout_reference_id)],
-                                                         limit=1)
-
-        if bank_statement_exist:
+        if bank_statement_exist := bank_statement_obj.search(
+            [('shopify_payout_ref', '=', self.payout_reference_id)], limit=1
+        ):
             self.write({'statement_id': bank_statement_exist.id})
             self.is_skip_from_cron = False
             return True
@@ -181,8 +178,7 @@ class ShopifyPaymentReportEpt(models.Model):
                 invoice_ids = order_id.invoice_ids.filtered(
                     lambda l: l.state == 'posted' and l.type == 'out_invoice' and l.amount_total == transaction.amount)
                 if not invoice_ids:
-                    message = "Invoice is not created for order %s in odoo" % (
-                            order_id.name or transaction.source_order_id)
+                    message = f"Invoice is not created for order {order_id.name or transaction.source_order_id} in odoo"
                     payout_logline_obj.create({'message': message,
                                                'is_skipped': True,
                                                'instance_id': self.instance_id.id,
@@ -190,13 +186,12 @@ class ShopifyPaymentReportEpt(models.Model):
                                                'payout_id': self.id})
                     transaction.is_remaining_statement = True
                     continue
-            if transaction.transaction_type == 'refund':
+            elif transaction.transaction_type == 'refund':
                 invoice_ids = order_id.invoice_ids.filtered(
                     lambda l: l.state == 'posted' and l.type == 'out_refund' and l.amount_total == -(
                         transaction.amount))
                 if not invoice_ids:
-                    message = "In shopify payout there is refund, but Refund is not created for order %s in odoo" % (
-                            order_id.name or transaction.source_order_id)
+                    message = f"In shopify payout there is refund, but Refund is not created for order {order_id.name or transaction.source_order_id} in odoo"
                     payout_logline_obj.create({'message': message,
                                                'is_skipped': True,
                                                'instance_id': self.instance_id.id,
@@ -241,7 +236,7 @@ class ShopifyPaymentReportEpt(models.Model):
                     'shopify_transaction_type': transaction.transaction_type,
                 }
                 if account_id:
-                    bank_line_vals.update({'account_ept_id': account_id.id})
+                    bank_line_vals['account_ept_id'] = account_id.id
                 bank_statement_line_obj.create(bank_line_vals)
 
         if self.check_process_statement():
@@ -257,10 +252,10 @@ class ShopifyPaymentReportEpt(models.Model):
         return True
 
     def check_reconciled_transactions(self, transaction, aml_rec=False):
-        payout_logline_obj = self.env['shopify.payout.logline.ept']
         reconciled = False
         if aml_rec and aml_rec.statement_id:
             message = 'Transaction line is already reconciled.'
+            payout_logline_obj = self.env['shopify.payout.logline.ept']
             payout_logline_obj.create({'message': message,
                                        'is_skipped': False,
                                        'instance_id': self.instance_id.id,

@@ -50,7 +50,7 @@ class ShopifyCustomerDataQueueLineEpt(models.Model):
         @author: Angel Patel @Emipro Technologies Pvt. Ltd on date 13/01/2020.
         """
         synced_shopify_customers_line_obj = self.env["shopify.customer.data.queue.line.ept"]
-        name = "%s %s" % (result.get("first_name") or "", result.get("last_name") or "")
+        name = f'{result.get("first_name") or ""} {result.get("last_name") or ""}'
         customer_id = result.get("id")
         data = json.dumps(result)
         line_vals = {
@@ -118,7 +118,7 @@ class ShopifyCustomerDataQueueLineEpt(models.Model):
         for queue in queues:
             instance = queue.shopify_instance_id
             if not instance.active:
-                _logger.info("Instance '{}' is not active.".format(instance.name))
+                _logger.info(f"Instance '{instance.name}' is not active.")
                 return True
 
             if queue.common_log_book_id:
@@ -142,9 +142,9 @@ class ShopifyCustomerDataQueueLineEpt(models.Model):
                     commit_count = 0
 
                 customer_data = json.loads(line.shopify_synced_customer_data)
-                main_partner = shopify_partner_obj.shopify_create_contact_partner(customer_data, instance, line,
-                                                                                  log_book_id)
-                if main_partner:
+                if main_partner := shopify_partner_obj.shopify_create_contact_partner(
+                    customer_data, instance, line, log_book_id
+                ):
                     for address in customer_data.get("addresses"):
                         if address.get("default"):
                             continue
@@ -156,7 +156,7 @@ class ShopifyCustomerDataQueueLineEpt(models.Model):
                 queue.is_process_queue = False
 
             queue.common_log_book_id = log_book_id
-            _logger.info("Customer Queue %s is processed." % queue.name)
+            _logger.info(f"Customer Queue {queue.name} is processed.")
             if log_book_id and not log_book_id.log_lines:
                 log_book_id.unlink()
         return True

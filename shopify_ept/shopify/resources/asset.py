@@ -8,9 +8,8 @@ class Asset(ShopifyResource):
 
     @classmethod
     def _prefix(cls, options={}):
-        theme_id = options.get("theme_id")
-        if theme_id:
-            return "%s/themes/%s" % (cls.site, theme_id)
+        if theme_id := options.get("theme_id"):
+            return f"{cls.site}/themes/{theme_id}"
         else:
             return cls.site
 
@@ -18,8 +17,7 @@ class Asset(ShopifyResource):
     def _element_path(cls, id, prefix_options={}, query_options=None):
         if query_options is None:
             prefix_options, query_options = cls._split_options(prefix_options)
-        return "%s%s.%s%s" % (cls._prefix(prefix_options)+'/', cls.plural,
-                              cls.format.extension, cls._query_string(query_options))
+        return f"{cls._prefix(prefix_options)}/{cls.plural}.{cls.format.extension}{cls._query_string(query_options)}"
 
     @classmethod
     def find(cls, key=None, **kwargs):
@@ -31,23 +29,22 @@ class Asset(ShopifyResource):
         if not key:
             return super(Asset, cls).find(**kwargs)
 
-        params = {"asset[key]": key}
-        params.update(kwargs)
+        params = {"asset[key]": key} | kwargs
         theme_id = params.get("theme_id")
-        path_prefix = "%s/themes/%s" % (cls.site, theme_id) if theme_id else cls.site
+        path_prefix = f"{cls.site}/themes/{theme_id}" if theme_id else cls.site
 
-        resource = cls.find_one("%s/assets.%s" % (path_prefix, cls.format.extension), **params)
+        resource = cls.find_one(
+            f"{path_prefix}/assets.{cls.format.extension}", **params
+        )
 
         if theme_id and resource:
             resource._prefix_options["theme_id"] = theme_id
         return resource
 
     def __get_value(self):
-        data = self.attributes.get("value")
-        if data:
+        if data := self.attributes.get("value"):
             return data
-        data = self.attributes.get("attachment")
-        if data:
+        if data := self.attributes.get("attachment"):
             return base64.b64decode(data).decode()
 
     def __set_value(self, data):
@@ -61,7 +58,7 @@ class Asset(ShopifyResource):
 
     def destroy(self):
         options = {"asset[key]": self.key}
-        options.update(self._prefix_options)
+        options |= self._prefix_options
         return self.__class__.connection.delete(self._element_path(self.key, options), self.__class__.headers)
 
     def is_new(self):
