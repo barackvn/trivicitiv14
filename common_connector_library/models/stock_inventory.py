@@ -66,15 +66,14 @@ class StockInventory(models.Model):
         :return: This method will return inventory line vals.
         Migration done by twinkalc August 2020
         """
-        vals = {
+        return {
             'company_id': self.company_id.id,
             'product_id': product.id,
             'inventory_id': self.id,
             'location_id': location.id,
-            'product_qty': 0 if qty <= 0 else qty,
+            'product_qty': max(qty, 0),
             'product_uom_id': product.uom_id.id if product.uom_id else False,
         }
-        return vals
 
     def prepare_inventory_vals_ept(self, location_id, inventory_products):
         """
@@ -82,7 +81,7 @@ class StockInventory(models.Model):
         @author: Maulik Barad on Date 20-Oct-2020.
 
         """
-        inventory_name = 'product_inventory_%s' % (time.strftime("%Y-%m-%d %H:%M:%S"))
+        inventory_name = f'product_inventory_{time.strftime("%Y-%m-%d %H:%M:%S")}'
         return {
             'name': inventory_name,
             'location_ids': [(6, 0, [location_id.id])] if location_id else False,

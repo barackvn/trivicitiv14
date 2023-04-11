@@ -2,10 +2,9 @@ from ..base import ShopifyResource
 from .usage_charge import UsageCharge
 
 def _get_first_by_status(resources, status):
-    for resource in resources:
-        if resource.status == status:
-            return resource
-    return None
+    return next(
+        (resource for resource in resources if resource.status == status), None
+    )
 
 
 class RecurringApplicationCharge(ShopifyResource):

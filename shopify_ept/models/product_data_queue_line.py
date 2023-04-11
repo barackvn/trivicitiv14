@@ -79,16 +79,20 @@ class ShopifyProductDataQueueLineEpt(models.Model):
         if queue_id:
             shopify_instance = queue_id.shopify_instance_id
             if not shopify_instance.active:
-                _logger.info("Instance '{}' is not active.".format(shopify_instance.name))
+                _logger.info(f"Instance '{shopify_instance.name}' is not active.")
                 return True
-            if queue_id.common_log_book_id:
-                log_book_id = queue_id.common_log_book_id
-            else:
-                log_book_id = common_log_book_obj.create({"type": "import",
-                                                          "module": "shopify_ept",
-                                                          "shopify_instance_id": shopify_instance.id,
-                                                          "model_id": model_id,
-                                                          "active": True})
+            log_book_id = (
+                queue_id.common_log_book_id
+                or common_log_book_obj.create(
+                    {
+                        "type": "import",
+                        "module": "shopify_ept",
+                        "shopify_instance_id": shopify_instance.id,
+                        "model_id": model_id,
+                        "active": True,
+                    }
+                )
+            )
             self.env.cr.execute(
                 """update shopify_product_data_queue_ept set is_process_queue = False where is_process_queue = True""")
             self._cr.commit()
@@ -117,7 +121,7 @@ class ShopifyProductDataQueueLineEpt(models.Model):
         """
         instance = self.shopify_instance_id
         if not instance.active:
-            _logger.info("Instance '{}' is not active.".format(instance.name))
+            _logger.info(f"Instance '{instance.name}' is not active.")
             return True
         instance.connect_in_shopify()
         if not self.product_data_id:

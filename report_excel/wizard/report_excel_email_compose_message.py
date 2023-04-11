@@ -13,8 +13,11 @@ class ReportExcelMailComposeMessage(models.TransientModel):
         self.ensure_one()
         values = self.onchange_template_id(self.template_id.id, self.composition_mode, self.model, self.res_id)['value']
         for fname, value in values.items():
-            if 'active_model' in self._context :
-                if not (self._context['active_model'] == 'report_excel_wizard' and fname == 'attachment_ids'):
-                    setattr(self, fname, value)     
+            if 'active_model' in self._context:
+                if (
+                    self._context['active_model'] != 'report_excel_wizard'
+                    or fname != 'attachment_ids'
+                ):
+                    setattr(self, fname, value)
             else:
                 setattr(self, fname, value)                 

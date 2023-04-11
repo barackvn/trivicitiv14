@@ -46,9 +46,11 @@ class ApiVersion(object):
         return site + self._path
 
     def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return False
-        return self.numeric_version == int(other.numeric_version)
+        return (
+            self.numeric_version == int(other.numeric_version)
+            if isinstance(other, type(self))
+            else False
+        )
 
 
 class Release(ApiVersion):
@@ -60,7 +62,7 @@ class Release(ApiVersion):
             raise InvalidVersionError
         self._name = version_number
         self._numeric_version = int(version_number.replace('-', ''))
-        self._path = '%s/%s' % (self.API_PREFIX, version_number)
+        self._path = f'{self.API_PREFIX}/{version_number}'
 
     @property
     def stable(self):

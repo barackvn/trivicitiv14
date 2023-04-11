@@ -43,7 +43,10 @@ class ShopifyLocationEpt(models.Model):
         location_warehouse = self.export_stock_warehouse_ids
         locations = self.search([('instance_id', '=', location_instance.id), ('id', '!=', self.id)])
         for location in locations:
-            if any([location in location_warehouse.ids for location in location.export_stock_warehouse_ids.ids]):
+            if any(
+                location in location_warehouse.ids
+                for location in location.export_stock_warehouse_ids.ids
+            ):
                 raise ValidationError(_("Can't set this warehouse in different locations with same instance."))
 
     @api.model
@@ -59,43 +62,59 @@ class ShopifyLocationEpt(models.Model):
         try:
             locations = shopify.Location.find()
         except ClientError as error:
-            if hasattr(error, "response"):
-                if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                    time.sleep(5)
-                    locations = shopify.Location.find()
+            if (
+                hasattr(error, "response")
+                and error.response.code == 429
+                and error.response.msg == "Too Many Requests"
+            ):
+                time.sleep(5)
+                locations = shopify.Location.find()
         except Exception as error:
             raise UserError(error)
         shop = shopify.Shop.current()
         for location in locations:
             location = location.to_dict()
-            vals = {}
-            vals.update({
+            vals = {} | {
                 'name': location.get('name'),
                 'shopify_location_id': location.get('id'),
                 'instance_id': instance_id,
                 'legacy': location.get('legacy'),
                 'shopify_instance_company_id': instance.shopify_company_id.id,
-                "active": True
-            })
-            shopify_location = self.with_context(active_test=False).search(
-                [('shopify_location_id', '=', location.get('id')), ('instance_id', '=', instance_id)])
-            if shopify_location:
+                "active": True,
+            }
+            if shopify_location := self.with_context(active_test=False).search(
+                [
+                    ('shopify_location_id', '=', location.get('id')),
+                    ('instance_id', '=', instance_id),
+                ]
+            ):
                 shopify_location.write(vals)
             else:
                 self.create(vals)
 
-        shopify_primary_location = self.search([('is_primary_location', '=', True), ('instance_id', '=', instance_id)],
-                                               limit=1)
-        if shopify_primary_location:
+        if shopify_primary_location := self.search(
+            [
+                ('is_primary_location', '=', True),
+                ('instance_id', '=', instance_id),
+            ],
+            limit=1,
+        ):
             shopify_primary_location.write({'is_primary_location': False})
 
         primary_location_id = shop and shop.to_dict().get('primary_location_id')
-        primary_location = primary_location_id and self.search(
-            [('shopify_location_id', '=', primary_location_id), ('instance_id', '=', instance_id)]) or False
-        if primary_location:
+        if (
+            primary_location := primary_location_id
+            and self.search(
+                [
+                    ('shopify_location_id', '=', primary_location_id),
+                    ('instance_id', '=', instance_id),
+                ]
+            )
+            or False
+        ):
             vals = {'is_primary_location': True}
             if not primary_location.export_stock_warehouse_ids:
-                vals.update({'export_stock_warehouse_ids': instance.shopify_warehouse_id})
+                vals['export_stock_warehouse_ids'] = instance.shopify_warehouse_id
             if not primary_location.import_stock_warehouse_id:
-                vals.update({'import_stock_warehouse_id': instance.shopify_warehouse_id})
+                vals['import_stock_warehouse_id'] = instance.shopify_warehouse_id
             primary_location.write(vals)

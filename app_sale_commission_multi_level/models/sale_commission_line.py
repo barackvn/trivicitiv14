@@ -50,10 +50,7 @@ class SaleCommissionLine(models.Model):
     @api.depends('expense_id')
     def _compute_state(self):
         for rec in self:
-            if not rec.expense_id:
-                rec.state = "no_expense"
-            else:
-                rec.state  = rec.expense_id.state
+            rec.state = rec.expense_id.state if rec.expense_id else "no_expense"
 
     @api.model
     def create(self, vals):
@@ -82,11 +79,10 @@ class SaleCommissionLine(models.Model):
     @api.onchange('percentage')
     def _onchange_percentage(self):
         amount = 0
-        percentage = self.percentage
-        if percentage:
+        if percentage := self.percentage:
             commission_amount_on = self.order_id.commission_amount_on
-            o_amount = self.order_id.amount_untaxed
             if commission_amount_on == 'amount_untaxed':
+                o_amount = self.order_id.amount_untaxed
                 amount =o_amount * self.percentage / 100
             else:
                 for p in self.order_id.order_line:
@@ -108,18 +104,22 @@ class SaleCommissionLine(models.Model):
         c_product = self.env['product.product'].browse(int(product_id))
 
         invoice_policy = c_product.invoice_policy
-        if company.commission_amount_on == 'product_template':
-            if product.is_commission_apply:
-                c_amount = amount * percentage / 100
-            else:
-                c_amount = 0
-        elif company.commission_amount_on == 'product_category':
-            if product.categ_id and product.categ_id.is_commission_apply:
-                c_amount = amount * percentage / 100
-            else:
-                c_amount = 0
-        else:
+        if (
+            company.commission_amount_on != 'product_category'
+            and company.commission_amount_on == 'product_template'
+            and product.is_commission_apply
+            or company.commission_amount_on
+            not in ['product_category', 'product_template']
+        ):
             c_amount = amount * percentage / 100
+        elif company.commission_amount_on != 'product_category':
+            c_amount = 0
+        else:
+            c_amount = (
+                amount * percentage / 100
+                if product.categ_id and product.categ_id.is_commission_apply
+                else 0
+            )
         # 处理按 订单 or 交货数量
         if invoice_policy == 'delivery':
             return c_amount * qty_delivered / product_uom_qty
@@ -140,7 +140,7 @@ class SaleCommissionLine(models.Model):
         for commission in self:
             if not commission.expense_id:
                 context = {
-                    'name': '%s:%s' % (commission.order_id.name, commission.level_id.name),
+                    'name': f'{commission.order_id.name}:{commission.level_id.name}',
                     'sale_order_id': commission.order_id.id,
                     'employee_id': int(employee_id.id),
                     'product_id': int(product_id),

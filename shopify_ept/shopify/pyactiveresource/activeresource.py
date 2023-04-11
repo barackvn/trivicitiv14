@@ -120,7 +120,7 @@ class Errors(object):
             decoded = {}
         if not decoded:
             decoded = {}
-        if isinstance(decoded, dict) and ('errors' in decoded or len(decoded) == 0):
+        if isinstance(decoded, dict) and ('errors' in decoded or not decoded):
             errors = decoded.get('errors', {})
             if isinstance(errors, list):
                 # Deprecated in ActiveResource
@@ -141,9 +141,7 @@ class Errors(object):
             if none exist for the given attribute.
         """
         errors = self.errors.get(attribute, [])
-        if len(errors) == 1:
-            return errors[0]
-        return errors
+        return errors[0] if len(errors) == 1 else errors
 
     def full_messages(self):
         """Returns all the full error messages in an array.
@@ -182,7 +180,7 @@ class ResourceMeta(type):
     Provides a separate namespace for configuration objects (user,password,
     site, etc)"""
 
-    def __new__(mcs, name, bases, new_attrs):
+    def __new__(cls, name, bases, new_attrs):
         """Create a new class.
 
         Args:
@@ -197,7 +195,7 @@ class ResourceMeta(type):
         if '_plural' not in new_attrs or not new_attrs['_plural']:
             new_attrs['_plural'] = util.pluralize(new_attrs['_singular'])
 
-        klass = type.__new__(mcs, name, bases, new_attrs)
+        klass = type.__new__(cls, name, bases, new_attrs)
 
         # if _site is defined, use the site property to ensure that user
         # and password are properly initialized.
@@ -210,120 +208,119 @@ class ResourceMeta(type):
     def connection(cls):
         """A connection object which handles all HTTP requests."""
         super_class = cls.__mro__[1]
-        if super_class == object or '_connection' in cls.__dict__:
-            if cls._connection is None:
-                cls._connection = connection.Connection(
-                    cls.site, cls.user, cls.password, cls.timeout, cls.format)
-            return cls._connection
-        else:
+        if super_class != object and '_connection' not in cls.__dict__:
             return super_class.connection
+        if cls._connection is None:
+            cls._connection = connection.Connection(
+                cls.site, cls.user, cls.password, cls.timeout, cls.format)
+        return cls._connection
 
-    def get_user(cls):
-        return cls._user
+    def get_user(self):
+        return self._user
 
-    def set_user(cls, value):
-      cls._connection = None
-      cls._user = value
+    def set_user(self, value):
+        self._connection = None
+        self._user = value
 
     user = property(get_user, set_user, None,
                     'A username for HTTP Basic Auth.')
 
-    def get_password(cls):
-        return cls._password
+    def get_password(self):
+        return self._password
 
-    def set_password(cls, value):
-        cls._connection = None
-        cls._password = value
+    def set_password(self, value):
+        self._connection = None
+        self._password = value
 
     password = property(get_password, set_password, None,
                         'A password for HTTP Basic Auth.')
 
-    def get_site(cls):
-        return cls._site
+    def get_site(self):
+        return self._site
 
-    def set_site(cls, value):
+    def set_site(self, value):
         if value is not None:
             parts = urllib.parse.urlparse(value)
             if parts.username:
-                cls._user = urllib.parse.unquote(parts.username)
+                self._user = urllib.parse.unquote(parts.username)
             if parts.password:
-                cls._password = urllib.parse.unquote(parts.password)
-        cls._connection = None
-        cls._site = value
+                self._password = urllib.parse.unquote(parts.password)
+        self._connection = None
+        self._site = value
 
     site = property(get_site, set_site, None,
                     'The base REST site to connect to.')
 
-    def get_headers(cls):
-        return cls._headers
+    def get_headers(self):
+        return self._headers
 
-    def set_headers(cls, value):
-        cls._headers = value
+    def set_headers(self, value):
+        self._headers = value
 
     headers = property(get_headers, set_headers, None,
                        'HTTP headers.')
 
-    def get_timeout(cls):
-        return cls._timeout
+    def get_timeout(self):
+        return self._timeout
 
-    def set_timeout(cls, value):
-        cls._connection = None
-        cls._timeout = value
+    def set_timeout(self, value):
+        self._connection = None
+        self._timeout = value
 
     timeout = property(get_timeout, set_timeout, None,
                        'Socket timeout for HTTP operations')
 
-    def get_format(cls):
-        return cls._format
+    def get_format(self):
+        return self._format
 
-    def set_format(cls, value):
-        cls._connection = None
-        cls._format = value
+    def set_format(self, value):
+        self._connection = None
+        self._format = value
 
     format = property(get_format, set_format, None,
                        'A format object for encoding/decoding requests')
 
-    def get_plural(cls):
-        return cls._plural
+    def get_plural(self):
+        return self._plural
 
-    def set_plural(cls, value):
-        cls._plural = value
+    def set_plural(self, value):
+        self._plural = value
 
     plural = property(get_plural, set_plural, None,
                       'The plural name of this object type.')
 
-    def get_singular(cls):
-        return cls._singular
+    def get_singular(self):
+        return self._singular
 
-    def set_singular(cls, value):
-        cls._singular = value
+    def set_singular(self, value):
+        self._singular = value
 
     singular = property(get_singular, set_singular, None,
                         'The singular name of this object type.')
 
-    def get_prefix_source(cls):
+    def get_prefix_source(self):
         """Return the prefix source, by default derived from site."""
-        if hasattr(cls, '_prefix_source'):
-            return cls._prefix_source
+        if hasattr(self, '_prefix_source'):
+            return self._prefix_source
         else:
-            return urllib.parse.urlsplit(cls.site)[2]
+            return urllib.parse.urlsplit(self.site)[2]
 
-    def set_prefix_source(cls, value):
+    def set_prefix_source(self, value):
         """Set the prefix source, which will be rendered into the prefix."""
-        cls._prefix_source = value
+        self._prefix_source = value
 
     prefix_source = property(get_prefix_source, set_prefix_source, None,
                              'prefix for lookups for this type of object.')
 
-    def prefix(cls, options=None):
+    def prefix(self, options=None):
         """Return the rendered prefix for this object."""
-        return cls._prefix(options)
+        return self._prefix(options)
 
-    def get_primary_key(cls):
-        return cls._primary_key
+    def get_primary_key(self):
+        return self._primary_key
 
-    def set_primary_key(cls, value):
-        cls._primary_key = value
+    def set_primary_key(self, value):
+        self._primary_key = value
 
     primary_key = property(get_primary_key, set_primary_key, None,
                            'Name of attribute that uniquely identies the resource')
@@ -353,10 +350,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
           attributes = {}
         self.klass = self.__class__
         self.attributes = {}
-        if prefix_options:
-            self._prefix_options = prefix_options
-        else:
-            self._prefix_options = {}
+        self._prefix_options = prefix_options or {}
         self._update(attributes)
         self.errors = Errors(self)
         self._initialized = True
@@ -397,8 +391,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
             connection.Error: On any communications errors.
             Error: On any other errors.
         """
-        resources = cls._find_every(from_=from_, **kwargs)
-        if resources:
+        if resources := cls._find_every(from_=from_, **kwargs):
             return resources[0]
 
     @classmethod
@@ -576,10 +569,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         Returns:
             A string containing the encoded query.
         """
-        if query_options:
-            return '?' + util.to_query(query_options)
-        else:
-            return ''
+        return f'?{util.to_query(query_options)}' if query_options else ''
 
     @classmethod
     def _element_path(cls, id_, prefix_options=None, query_options=None):
@@ -638,14 +628,13 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
             The path (relative to site) to this type of collection.
         """
         prefix_options, query_options = cls._split_options(options)
-        path = (
-            '%(prefix)s/%(plural)s/%(method_name)s.%(format)s%(query)s' %
-            {'prefix': cls._prefix(prefix_options),
-             'plural': cls._plural,
-             'method_name': method_name,
-             'format': cls.format.extension,
-             'query': cls._query_string(query_options)})
-        return path
+        return '%(prefix)s/%(plural)s/%(method_name)s.%(format)s%(query)s' % {
+            'prefix': cls._prefix(prefix_options),
+            'plural': cls._plural,
+            'method_name': method_name,
+            'format': cls.format.extension,
+            'query': cls._query_string(query_options),
+        }
 
     @classmethod
     def _class_get(cls, method_name, **kwargs):
@@ -773,7 +762,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         return values
 
     def encode(self, **options):
-        return getattr(self, "to_" + self.klass.format.extension)(**options)
+        return getattr(self, f"to_{self.klass.format.extension}")(**options)
 
     def to_xml(self, root=None, header=True, pretty=False, dasherize=True):
         """Convert the object to an xml string.
@@ -834,8 +823,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
                         self._collection_path(self._prefix_options),
                         self.klass.headers,
                         data=self.encode())
-                new_id = self._id_from_response(response)
-                if new_id:
+                if new_id := self._id_from_response(response):
                     self.id = new_id
         except connection.ResourceInvalid as err:
             if self.klass.format == formats.XMLFormat:
@@ -869,14 +857,14 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         Returns:
            An id string.
         """
-        match = re.search(r'\/([^\/]*?)(\.\w+)?$',
-                          response.get('Location',
-                                       response.get('location', '')))
-        if match:
+        if match := re.search(
+            r'\/([^\/]*?)(\.\w+)?$',
+            response.get('Location', response.get('location', '')),
+        ):
             try:
-                return int(match.group(1))
+                return int(match[1])
             except ValueError:
-                return match.group(1)
+                return match[1]
 
     def destroy(self):
         """Deletes the resource from the remote service.
@@ -908,9 +896,8 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         Raises:
             AttributeError: if no such attribute exists.
         """
-        if 'attributes' in self.__dict__:
-            if name in self.attributes:
-                return self.attributes[name]
+        if 'attributes' in self.__dict__ and name in self.attributes:
+            return self.attributes[name]
         raise AttributeError(name)
 
     def __setattr__(self, name, value):
@@ -933,7 +920,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
             object.__setattr__(self, name, value)
 
     def __repr__(self):
-        return '%s(%s)' % (self._singular, self.id)
+        return f'{self._singular}({self.id})'
 
     if six.PY2:
 
@@ -1025,8 +1012,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
             except ImportError:
                 continue
             try:
-                klass = getattr(module, class_name)
-                return klass
+                return getattr(module, class_name)
             except AttributeError:
                 try:
                     __import__('.'.join([module.__name__, element_name]))
@@ -1035,8 +1021,7 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
                 except ImportError:
                     continue
                 try:
-                    klass = getattr(submodule, class_name)
-                    return klass
+                    return getattr(submodule, class_name)
                 except AttributeError:
                     continue
 
@@ -1056,15 +1041,17 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         """
         prefix_options, query_options = self._split_options(options)
         prefix_options.update(self._prefix_options)
-        path = (
-            '%(prefix)s/%(plural)s/%(id)s/%(method_name)s.%(format)s%(query)s' %
-            {'prefix': self.klass.prefix(prefix_options),
-             'plural': self._plural,
-             'id': self.id,
-             'method_name': method_name,
-             'format': self.klass.format.extension,
-             'query': self._query_string(query_options)})
-        return path
+        return (
+            '%(prefix)s/%(plural)s/%(id)s/%(method_name)s.%(format)s%(query)s'
+            % {
+                'prefix': self.klass.prefix(prefix_options),
+                'plural': self._plural,
+                'id': self.id,
+                'method_name': method_name,
+                'format': self.klass.format.extension,
+                'query': self._query_string(query_options),
+            }
+        )
 
     def _custom_method_new_element_url(self, method_name, options):
         """Get the element path for creating new objects of this type.
@@ -1077,14 +1064,13 @@ class ActiveResource(six.with_metaclass(ResourceMeta, object)):
         """
         prefix_options, query_options = self._split_options(options)
         prefix_options.update(self._prefix_options)
-        path = (
-            '%(prefix)s/%(plural)s/new/%(method_name)s.%(format)s%(query)s' %
-            {'prefix': self.klass.prefix(prefix_options),
-             'plural': self._plural,
-             'method_name': method_name,
-             'format': self.klass.format.extension,
-             'query': self._query_string(query_options)})
-        return path
+        return '%(prefix)s/%(plural)s/new/%(method_name)s.%(format)s%(query)s' % {
+            'prefix': self.klass.prefix(prefix_options),
+            'plural': self._plural,
+            'method_name': method_name,
+            'format': self.klass.format.extension,
+            'query': self._query_string(query_options),
+        }
 
     def _instance_get(self, method_name, **kwargs):
         """Get a nested resource or resources.

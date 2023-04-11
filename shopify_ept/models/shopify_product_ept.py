@@ -72,8 +72,7 @@ class ShopifyProductProductEpt(models.Model):
 
         template_title = result.get("title", "")
 
-        attrib_line_vals = self.shopify_prepare_attribute_vals(result)
-        if attrib_line_vals:
+        if attrib_line_vals := self.shopify_prepare_attribute_vals(result):
             product_template = product_template_obj.create({"name": template_title,
                                                             "type": "product",
                                                             "attribute_line_ids": attrib_line_vals,
@@ -82,9 +81,9 @@ class ShopifyProductProductEpt(models.Model):
                                                             })
 
             self.shopify_update_price(instance, product_template, price)
-            odoo_product = self.shopify_set_variant_sku(result, product_template, instance)
-
-            if odoo_product:
+            if odoo_product := self.shopify_set_variant_sku(
+                result, product_template, instance
+            ):
                 return product_template
         return False
 
@@ -104,9 +103,9 @@ class ShopifyProductProductEpt(models.Model):
             attr_val_ids = []
 
             for attrib_value in attrib_values:
-                attribute_value = product_attribute_value_obj.get_attribute_values(attrib_value, attribute.id,
-                                                                                   auto_create=True)
-                if attribute_value:
+                if attribute_value := product_attribute_value_obj.get_attribute_values(
+                    attrib_value, attribute.id, auto_create=True
+                ):
                     attribute_value = attribute_value[0]
                     attr_val_ids.append(attribute_value.id)
 
@@ -255,7 +254,7 @@ class ShopifyProductProductEpt(models.Model):
             result = new_product.save()
 
             if not result:
-                message = "Product %s not exported in Shopify Store." % template.name
+                message = f"Product {template.name} not exported in Shopify Store."
                 self.shopify_export_product_log_line(message, model_id, log_book_id)
             if result:
                 self.update_products_details_shopify_third_layer(new_product, template, is_publish)
@@ -282,18 +281,17 @@ class ShopifyProductProductEpt(models.Model):
             product_attribute_lines = product_attribute_line_obj.search(
                 [("id", "in", template.product_tmpl_id.attribute_line_ids.ids)], order="attribute_id")
             for attribute_line in product_attribute_lines:
-                info = {}
                 attribute = attribute_line.attribute_id
-                value_names = []
-                for value in attribute_line.value_ids:
-                    value_names.append(value.name)
-
-                info.update({"name": attribute.name or attribute.name, "values": value_names,
-                             "position": attribute_position})
+                value_names = [value.name for value in attribute_line.value_ids]
+                info = {} | {
+                    "name": attribute.name or attribute.name,
+                    "values": value_names,
+                    "position": attribute_position,
+                }
                 attribute_list.append(info)
                 attribute_position = attribute_position + 1
-                # if attribute_position > 3:
-                #     break
+                        # if attribute_position > 3:
+                        #     break
             new_product.options = attribute_list
         return True
 
@@ -327,10 +325,13 @@ class ShopifyProductProductEpt(models.Model):
             try:
                 new_product = shopify.Product().find(template.shopify_tmpl_id)
             except ClientError as error:
-                if hasattr(error, "response"):
-                    if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                        time.sleep(5)
-                        new_product = shopify.Product().find(template.shopify_tmpl_id)
+                if (
+                    hasattr(error, "response")
+                    and error.response.code == 429
+                    and error.response.msg == "Too Many Requests"
+                ):
+                    time.sleep(5)
+                    new_product = shopify.Product().find(template.shopify_tmpl_id)
             except Exception as error:
                 message = "Template %s not found in shopify while updating Product.\nError: %s" % (
                     template.shopify_tmpl_id, str(error))
@@ -340,9 +341,7 @@ class ShopifyProductProductEpt(models.Model):
             self.prepare_shopify_product_for_update_export(new_product, template, instance, is_set_basic_detail,
                                                            is_publish, is_set_price)
 
-            result = new_product.save()
-
-            if result:
+            if result := new_product.save():
                 self.update_products_details_shopify_third_layer(new_product, template, is_publish)
             if is_set_images:
                 self.update_product_images(shopify_template=template)
@@ -396,20 +395,22 @@ class ShopifyProductProductEpt(models.Model):
         """
         variant_vals = {}
         if variant.variant_id:
-            variant_vals.update({"id": variant.variant_id})
+            variant_vals["id"] = variant.variant_id
         if is_set_price:
             price = instance.shopify_pricelist_id.get_product_price(variant.product_id, 1.0, partner=False,
                                                                     uom_id=variant.product_id.uom_id.id)
-            variant_vals.update({"price": float(price)})
+            variant_vals["price"] = float(price)
         if is_set_basic_detail:
-            variant_vals.update({"barcode": variant.product_id.barcode or "",
-                                 "grams": int(variant.product_id.weight * 1000),
-                                 "weight": variant.product_id.weight,
-                                 "weight_unit": "kg",
-                                 "requires_shipping": "true", "sku": variant.default_code,
-                                 "taxable": variant.taxable and "true" or "false",
-                                 "title": variant.name,
-                                 })
+            variant_vals |= {
+                "barcode": variant.product_id.barcode or "",
+                "grams": int(variant.product_id.weight * 1000),
+                "weight": variant.product_id.weight,
+                "weight_unit": "kg",
+                "requires_shipping": "true",
+                "sku": variant.default_code,
+                "taxable": variant.taxable and "true" or "false",
+                "title": variant.name,
+            }
             option_index = 0
             option_index_value = ["option1", "option2", "option3"]
             attribute_value_obj = self.env["product.template.attribute.value"]
@@ -419,18 +420,18 @@ class ShopifyProductProductEpt(models.Model):
             for att_value in att_values:
                 if option_index > 3:
                     continue
-                variant_vals.update({option_index_value[option_index]: att_value.name})
+                variant_vals[option_index_value[option_index]] = att_value.name
                 option_index = option_index + 1
 
         if variant.inventory_management == "shopify":
-            variant_vals.update({"inventory_management": "shopify"})
+            variant_vals["inventory_management"] = "shopify"
         else:
-            variant_vals.update({"inventory_management": None})
+            variant_vals["inventory_management"] = None
 
         if variant.check_product_stock == "continue":
-            variant_vals.update({"inventory_policy": "continue"})
+            variant_vals["inventory_policy"] = "continue"
         else:
-            variant_vals.update({"inventory_policy": "deny"})
+            variant_vals["inventory_policy"] = "deny"
 
         return variant_vals
 
@@ -498,8 +499,7 @@ class ShopifyProductProductEpt(models.Model):
             shopify_image.attachment = image.odoo_image_id.image.decode("utf-8")
             if image.odoo_image_id.template_id and image.odoo_image_id.product_id:
                 shopify_image.variant_ids = [int(image.shopify_variant_id.variant_id)]
-            result = shopify_image.save()
-            if result:
+            if result := shopify_image.save():
                 image.write({"shopify_image_id": shopify_image.id})
 
         return True
@@ -515,10 +515,13 @@ class ShopifyProductProductEpt(models.Model):
         try:
             shopify_images = shopify.Image().find(product_id=int(shopify_template.shopify_tmpl_id))
         except ClientError as error:
-            if hasattr(error, "response"):
-                if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                    time.sleep(5)
-                    shopify_images = shopify.Image().find(product_id=shopify_template.shopify_tmpl_id)
+            if (
+                hasattr(error, "response")
+                and error.response.code == 429
+                and error.response.msg == "Too Many Requests"
+            ):
+                time.sleep(5)
+                shopify_images = shopify.Image().find(product_id=shopify_template.shopify_tmpl_id)
 
         for image in shopify_template.shopify_image_ids:
             if not image.shopify_image_id:
@@ -527,8 +530,7 @@ class ShopifyProductProductEpt(models.Model):
                 shopify_image.attachment = image.odoo_image_id.image.decode("utf-8")
                 if image.shopify_variant_id:
                     shopify_image.variant_ids = [int(image.shopify_variant_id.variant_id)]
-                result = shopify_image.save()
-                if result:
+                if result := shopify_image.save():
                     image.write({"shopify_image_id": shopify_image.id})
             else:
                 ############################################
@@ -556,12 +558,11 @@ class ShopifyProductProductEpt(models.Model):
         here we use InventoryLevel shopify API for export stock
         @author: Maulik Barad on Date 15-Sep-2020.
         """
-        common_log_line_obj = self.env["common.log.lines.ept"]
         product_obj = self.env["product.product"]
 
         log_line_array = []
-        model = "shopify.product.product.ept"
-        model_id = common_log_line_obj.get_model_id(model)
+        common_log_line_obj = self.env["common.log.lines.ept"]
+        model_id = common_log_line_obj.get_model_id("shopify.product.product.ept")
 
         shopify_products = self.search([("shopify_instance_id", "=", instance.id),
                                         ("exported_in_shopify", "=", True),
@@ -572,13 +573,13 @@ class ShopifyProductProductEpt(models.Model):
         instance.connect_in_shopify()
         location_ids = self.env["shopify.location.ept"].search([("instance_id", "=", instance.id)])
         if not location_ids:
-            message = "Location not found for instance %s while update stock" % instance.name
+            message = f"Location not found for instance {instance.name} while update stock"
             log_line_array = self.shopify_create_log(message, model_id, False, log_line_array)
 
         for location_id in location_ids:
             shopify_location_warehouse = location_id.export_stock_warehouse_ids or False
             if not shopify_location_warehouse:
-                message = "No Warehouse found for Export Stock in Shopify Location: %s" % location_id.name
+                message = f"No Warehouse found for Export Stock in Shopify Location: {location_id.name}"
                 log_line_array = self.shopify_create_log(message, model_id, False, log_line_array)
                 continue
 
@@ -590,9 +591,7 @@ class ShopifyProductProductEpt(models.Model):
                 odoo_product = shopify_product.product_id
                 if odoo_product.type == "product":
                     if not shopify_product.inventory_item_id:
-                        message = "Inventory Item Id did not found for Shopify Product Variant ID " \
-                                  "%s with name %s for instance %s while Export stock" % (
-                                      shopify_product.id, shopify_product.name, instance.name)
+                        message = f"Inventory Item Id did not found for Shopify Product Variant ID {shopify_product.id} with name {shopify_product.name} for instance {instance.name} while Export stock"
                         log_line_array = self.shopify_create_log(message, model_id, odoo_product, log_line_array)
                         continue
 
@@ -616,16 +615,24 @@ class ShopifyProductProductEpt(models.Model):
                                                            shopify_product.inventory_item_id,
                                                            int(quantity))
                                 continue
-                            message = "Error while Export stock for Product ID: %s & Product Name: '%s' for instance:" \
-                                      "'%s'\nError: %s\n%s" % (odoo_product.id, odoo_product.name, instance.name,
-                                                               str(error.response.code) + " " + error.response.msg,
-                                                               json.loads(error.response.body.decode()).get("errors")[0]
-                                                               )
+                            message = (
+                                "Error while Export stock for Product ID: %s & Product Name: '%s' for instance:"
+                                "'%s'\nError: %s\n%s"
+                                % (
+                                    odoo_product.id,
+                                    odoo_product.name,
+                                    instance.name,
+                                    f"{str(error.response.code)} {error.response.msg}",
+                                    json.loads(error.response.body.decode()).get(
+                                        "errors"
+                                    )[0],
+                                )
+                            )
                             log_line_array = self.shopify_create_log(message, model_id, odoo_product, log_line_array)
 
                     except Exception as error:
                         message = "Error while Export stock for Product ID: %s & Product Name: '%s' for instance: " \
-                                  "'%s'\nError: %s" % (odoo_product.id, odoo_product.name, instance.name, str(error))
+                                      "'%s'\nError: %s" % (odoo_product.id, odoo_product.name, instance.name, str(error))
                         log_line_array = self.shopify_create_log(message, model_id, odoo_product, log_line_array)
 
         if len(log_line_array) > 0:
@@ -676,18 +683,22 @@ class ShopifyProductProductEpt(models.Model):
         inventory_adjustments = stock_inventory_obj.search(
             [("is_shopify_product_adjustment", "=", True), ("state", "!=", "done")])
         for inventory_adjustment in inventory_adjustments:
-            if not inventory_adjustment.state == "cancel":
+            if inventory_adjustment.state != "cancel":
                 inventory_adjustment.action_cancel_draft()
                 inventory_adjustment.write({"state": "cancel"})
 
-        templates = self.search([("shopify_instance_id", "=", instance.id), ("exported_in_shopify", "=", True)])
-        if templates:
+        if templates := self.search(
+            [
+                ("shopify_instance_id", "=", instance.id),
+                ("exported_in_shopify", "=", True),
+            ]
+        ):
             instance.connect_in_shopify()
 
             location_ids = self.env["shopify.location.ept"].search(
                 [("legacy", "=", False), ("instance_id", "=", instance.id)])
             if not location_ids:
-                message = "Location not found for instance %s while Importing stock" % instance.name
+                message = f"Location not found for instance {instance.name} while Importing stock"
                 log_line_array = self.shopify_create_log(message, model_id, False, log_line_array)
                 self.create_log(log_line_array, "import", instance)
                 _logger.info(message)
@@ -698,7 +709,7 @@ class ShopifyProductProductEpt(models.Model):
                 product_ids_list = []
                 shopify_location_warehouse = location_id.import_stock_warehouse_id or False
                 if not shopify_location_warehouse:
-                    message = "No Warehouse found for importing stock in Shopify Location: %s" % location_id.name
+                    message = f"No Warehouse found for importing stock in Shopify Location: {location_id.name}"
                     log_line_array = self.shopify_create_log(message, model_id, False, log_line_array)
                     _logger.info(message)
                     continue
@@ -709,24 +720,37 @@ class ShopifyProductProductEpt(models.Model):
                     if len(inventory_levels) == 250:
                         inventory_levels = self.shopify_list_all_inventory_level(inventory_levels)
                 except Exception as error:
-                    message = "Error while import stock for instance %s\nError: %s" % (
-                        instance.name, str(error.response.code) + " " + error.response.msg)
+                    message = (
+                        "Error while import stock for instance %s\nError: %s"
+                        % (
+                            instance.name,
+                            f"{str(error.response.code)} {error.response.msg}",
+                        )
+                    )
                     log_line_array = self.shopify_create_log(message, model_id, False, log_line_array)
                     _logger.info(message)
                     self.create_log(log_line_array, "import", instance)
                     return False
 
-                _logger.info("Length of the total inventory item id : %s" % len(inventory_levels))
+                _logger.info(
+                    f"Length of the total inventory item id : {len(inventory_levels)}"
+                )
                 lot_stock_id = location_id.import_stock_warehouse_id.lot_stock_id.id
                 for inventory_level in inventory_levels:
                     inventory_level = inventory_level.to_dict()
                     inventory_item_id = inventory_level.get("inventory_item_id")
                     qty = inventory_level.get("available")
 
-                    shopify_product = self.env["shopify.product.product.ept"].search(
-                        [("inventory_item_id", "=", inventory_item_id), ("exported_in_shopify", "=", True),
-                         ("shopify_instance_id", "=", instance.id)], limit=1)
-                    if shopify_product:
+                    if shopify_product := self.env[
+                        "shopify.product.product.ept"
+                    ].search(
+                        [
+                            ("inventory_item_id", "=", inventory_item_id),
+                            ("exported_in_shopify", "=", True),
+                            ("shopify_instance_id", "=", instance.id),
+                        ],
+                        limit=1,
+                    ):
                         product_id = shopify_product.product_id
                         if product_id not in product_ids_list:
                             stock_inventory_line = {
@@ -737,14 +761,15 @@ class ShopifyProductProductEpt(models.Model):
                             stock_inventory_array.append(stock_inventory_line)
                             product_ids_list.append(product_id)
 
-                if len(stock_inventory_array) > 0:
-                    inventories = stock_inventory_obj.create_stock_inventory_ept(
-                        stock_inventory_array, location_id.import_stock_warehouse_id.lot_stock_id, False)
-                    if inventories:
-                        inventory_name = 'Inventory For Instance "%s" And Shopify Location "%s"' % (
-                            instance.name + " " + datetime.now().strftime("%d-%m-%Y"), location_id.name)
+                if stock_inventory_array:
+                    if inventories := stock_inventory_obj.create_stock_inventory_ept(
+                        stock_inventory_array,
+                        location_id.import_stock_warehouse_id.lot_stock_id,
+                        False,
+                    ):
+                        inventory_name = f'Inventory For Instance "{f"{instance.name} " + datetime.now().strftime("%d-%m-%Y")}" And Shopify Location "{location_id.name}"'
                         inventories.write({'is_shopify_product_adjustment': True, 'name': inventory_name})
-                        _logger.info("Created %s." % inventory_name)
+                        _logger.info(f"Created {inventory_name}.")
 
         if len(log_line_array) > 0:
             self.create_log(log_line_array, "import", instance)
@@ -772,10 +797,13 @@ class ShopifyProductProductEpt(models.Model):
                     try:
                         result = shopify.InventoryLevel.find(page_info=page_info, limit=250)
                     except ClientError as error:
-                        if hasattr(error, "response"):
-                            if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                                time.sleep(5)
-                                result = shopify.InventoryLevel.find(page_info=page_info, limit=250)
+                        if (
+                            hasattr(error, "response")
+                            and error.response.code == 429
+                            and error.response.msg == "Too Many Requests"
+                        ):
+                            time.sleep(5)
+                            result = shopify.InventoryLevel.find(page_info=page_info, limit=250)
                     except Exception as error:
                         raise UserError(error)
             if catch == page_info:

@@ -12,8 +12,7 @@ class ShopifyOnboardingConfirmationEpt(models.TransientModel):
            @author: Dipak Gogiya
            :return: True
         """
-        instance_id = self._context.get('shopify_instance_id', False)
-        if instance_id:
+        if instance_id := self._context.get('shopify_instance_id', False):
             instance = self.env['shopify.instance.ept'].browse(instance_id)
             company = instance.shopify_company_id
             company.write({
@@ -28,7 +27,8 @@ class ShopifyOnboardingConfirmationEpt(models.TransientModel):
                 'effect': {
                     'fadeout': 'slow',
                     'message': _(
-                        "Congratulations, You have done All Configurations of the instance: {}".format(instance.name)),
+                        f"Congratulations, You have done All Configurations of the instance: {instance.name}"
+                    ),
                     'img_url': '/web/static/src/img/smile.svg',
                     'type': 'rainbow_man',
                 }

@@ -28,18 +28,17 @@ class ResPartner(models.Model):
         @return: partner object or False
         Migration done by twinkalc August 2020
         """
-        if key_list and vals:
-            _domain = [] + extra_domain
-            for key in key_list:
-                if not vals.get(key):
-                    continue
-                if (key in vals) and isinstance(vals.get(key), str):
-                    _domain.append((key, '=ilike', vals.get(key)))
-                else:
-                    _domain.append((key, '=', vals.get(key)))
-            partner = self.search(_domain, limit=1) if _domain else False
-            return partner
-        return False
+        if not key_list or not vals:
+            return False
+        _domain = [] + extra_domain
+        for key in key_list:
+            if not vals.get(key):
+                continue
+            if (key in vals) and isinstance(vals.get(key), str):
+                _domain.append((key, '=ilike', vals.get(key)))
+            else:
+                _domain.append((key, '=', vals.get(key)))
+        return self.search(_domain, limit=1) if _domain else False
 
     def search_partner_by_email(self, email):
         """
@@ -50,8 +49,7 @@ class ResPartner(models.Model):
         @Updated By : Dipak Gogiya, 21/09/2020
         :return: res.partner()
         """
-        partner = self.search([('email', '=ilike', email)], limit=1)
-        return partner
+        return self.search([('email', '=ilike', email)], limit=1)
 
     def get_country(self, country_name_or_code):
         """
@@ -62,9 +60,14 @@ class ResPartner(models.Model):
             @Updated By : Dipak Gogiya, 21/09/2020
             :return: res.country()
         """
-        country = self.env['res.country'].search(['|', ('code', '=ilike', country_name_or_code),
-                                                  ('name', '=ilike', country_name_or_code)], limit=1)
-        return country
+        return self.env['res.country'].search(
+            [
+                '|',
+                ('code', '=ilike', country_name_or_code),
+                ('name', '=ilike', country_name_or_code),
+            ],
+            limit=1,
+        )
 
     def create_or_update_state_ept(self, country_code, state_name_or_code, zip_code, country_obj=False):
         """
@@ -73,10 +76,7 @@ class ResPartner(models.Model):
         Modified the below method to set state from the api of zippopotam.
         Migration done by twinkalc August 2020
         """
-        if not country_obj:
-            country = self.get_country(country_code)
-        else:
-            country = country_obj
+        country = country_obj or self.get_country(country_code)
         state = self.env['res.country.state'].search(['|', ('name', '=ilike', state_name_or_code),
                                                       ('code', '=ilike', state_name_or_code),
                                                       ('country_id', '=', country.id)], limit=1)
@@ -96,7 +96,7 @@ class ResPartner(models.Model):
         """
         state_obj = state = self.env['res.country.state']
         try:
-            url = 'https://api.zippopotam.us/' + country_code + '/' + zip_code.split('-')[0]
+            url = f'https://api.zippopotam.us/{country_code}/' + zip_code.split('-')[0]
             response = requests.get(url)
             response = ast.literal_eval(response.content.decode('utf-8'))
         except:

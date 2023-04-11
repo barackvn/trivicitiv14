@@ -84,9 +84,8 @@ class ReportExcelGen(models.TransientModel):
                            'Supported formats are: %s') % (file_format,
                                                            ','.join(SUPPORTED_FORMATS))
                 raise UserError(msg)
-        if is_file_like:
-            if getattr(file, 'encoding', None) is not None:
-                raise IOError("File-object must be opened in binary mode")
+        if is_file_like and getattr(file, 'encoding', None) is not None:
+            raise IOError("File-object must be opened in binary mode")
         try:
             archive = ZipFile(file, 'r', ZIP_DEFLATED)
             archive.testzip()
@@ -107,9 +106,9 @@ class ReportExcelGen(models.TransientModel):
         try:
             shutil.copy(src, dest)
         except shutil.Error as e:
-            _logger.info('Error: %s' % e)
+            _logger.info(f'Error: {e}')
         except IOError as e:
-            _logger.info('Error: %s' % e.strerror)
+            _logger.info(f'Error: {e.strerror}')
     def create_xls(self, datas=None, cellutil=None):
         datas = datas if datas is not None else {}
         tmp_dir = tempfile.gettempdir()

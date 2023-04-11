@@ -89,20 +89,27 @@ class ShopifyCancelRefundOrderWizard(models.TransientModel):
             # raise. if raise warring it will not commit so we need to write commit.
             order_id._cr.commit()
             warning_message = "1.Order cancel in Shopify but unable to create a credit note." \
-                              "2.Since order may be uncreated or unpaid invoice."
+                                  "2.Since order may be uncreated or unpaid invoice."
             raise UserError(warning_message)
         default_values_list = []
         for move in moves:
             date = self.refund_date or move.date
-            default_values_list.append({
-                'ref': _('Reversal of: %s, %s') % (move.name, self.reason) if self.reason else _(
-                    'Reversal of: %s') % move.name,
-                'date': date,
-                'invoice_date': move.is_invoice(include_receipts=True) and date or False,
-                'journal_id': self.journal_id and self.journal_id.id or move.journal_id.id,
-                'invoice_payment_term_id': None,
-                'auto_post': True if date > fields.Date.context_today(self) else False,
-            })
+            default_values_list.append(
+                {
+                    'ref': _('Reversal of: %s, %s') % (move.name, self.reason)
+                    if self.reason
+                    else _('Reversal of: %s') % move.name,
+                    'date': date,
+                    'invoice_date': move.is_invoice(include_receipts=True)
+                    and date
+                    or False,
+                    'journal_id': self.journal_id
+                    and self.journal_id.id
+                    or move.journal_id.id,
+                    'invoice_payment_term_id': None,
+                    'auto_post': date > fields.Date.context_today(self),
+                }
+            )
         moves._reverse_moves(default_values_list)
         return True
 
@@ -139,15 +146,14 @@ class ShopifyCancelRefundOrderWizard(models.TransientModel):
                     shopify_location_id = order_id.shopify_location_id or False
                     if not shopify_location_id:
                         log_message = "Location is not set in order (%s).Unable to refund in shopify.\n You can see " \
-                                      "order location here: Order => Shopify Info => Shopify Location " % order_id.name
+                                          "order location here: Order => Shopify Info => Shopify Location " % order_id.name
                         log_line = self.env["common.log.lines.ept"].shopify_create_order_log_line(log_message, model_id,
                                                                                                   order_id, False,
                                                                                                   order_id.name)
                         mismatch_log_lines.append(log_line.id)
                         do_not_order_process_ids.append(order_id.id)
                         continue
-                    refund_line_dict.update(
-                        {'location_id': shopify_location_id.shopify_location_id})
+                    refund_line_dict['location_id'] = shopify_location_id.shopify_location_id
                 refund_lines_list.append(refund_line_dict)
 
             log_lines = self.create_refund_in_shopify(orders, credit_note_id, refund_lines_list,
@@ -183,9 +189,10 @@ class ShopifyCancelRefundOrderWizard(models.TransientModel):
                 continue
             outgoing_picking_ids = order.mapped('picking_ids').filtered(
                 lambda picking: picking.picking_type_id.code == 'outgoing' and picking.state == 'done')
-            incoming_picking_ids = order.mapped('picking_ids').filtered(
-                lambda picking: picking.picking_type_id.code == 'incoming' and picking.state == 'done')
-            if incoming_picking_ids:
+            if incoming_picking_ids := order.mapped('picking_ids').filtered(
+                lambda picking: picking.picking_type_id.code == 'incoming'
+                and picking.state == 'done'
+            ):
                 in_picking_total_qty = sum(
                     incoming_picking_ids.mapped('move_lines').mapped('quantity_done'))
             if outgoing_picking_ids:
@@ -193,9 +200,9 @@ class ShopifyCancelRefundOrderWizard(models.TransientModel):
                     outgoing_picking_ids.mapped('move_lines').mapped('quantity_done'))
 
             if in_picking_total_qty == out_picking_total_qty:
-                shipping.update({"full_refund": True})
+                shipping["full_refund"] = True
             else:
-                shipping.update({'amount': 0.0})
+                shipping['amount'] = 0.0
             refund_amount = credit_note_id.amount_total
             total_refund_in_shopify = 0.0
             total_order_amount = order.amount_total
@@ -236,8 +243,7 @@ class ShopifyCancelRefundOrderWizard(models.TransientModel):
             try:
                 refund_in_shopify.create(vals)
             except Exception as error:
-                log_message = "When creating refund in Shopify for order (%s), issue arrive in " \
-                              "request (%s)" % (order.name, error)
+                log_message = f"When creating refund in Shopify for order ({order.name}), issue arrive in request ({error})"
                 log_line = self.inv["common.log.lines.ept"].shopify_create_order_log_line(
                     log_message, model_id, order, False, order.name)
                 mismatch_logline.append(log_line.id)

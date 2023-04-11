@@ -25,9 +25,10 @@ class SaleReport(models.Model):
             Task_id: 167120
         """
         version_info = odoo.service.common.exp_version()
-        if version_info.get('server_version') == '14.0':
-            action = self.env.ref('shopify_ept.shopify_action_order_report_all').read()[0]
-        else:
-            action = self.env.ref('shopify_ept.shopify_sale_report_action_dashboard').read()[0]
-
-        return action
+        return (
+            self.env.ref('shopify_ept.shopify_action_order_report_all').read()[0]
+            if version_info.get('server_version') == '14.0'
+            else self.env.ref(
+                'shopify_ept.shopify_sale_report_action_dashboard'
+            ).read()[0]
+        )

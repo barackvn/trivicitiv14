@@ -23,23 +23,22 @@ class ReportExcelController(http.Controller):
             attach_fname = context_id['name']
             store_fname = context_id['store_fname']
             attach_fpath = context_id._full_path(store_fname)
-        filename = attach_fname if not filename else filename
-        filename_attachment = 'attachment; filename=' + filename + ';'
+        filename = filename or attach_fname
+        filename_attachment = f'attachment; filename={filename};'
         filename_attachment = filename_attachment.encode('utf-8')
         try:
             with open(attach_fpath, "rb") as f:
                 content = f.read()
                 f.close()
             if ".".join(filename.split('.')[1:]) in SUPPORTED_FORMATS:
-                response = request.make_response(
+                return request.make_response(
                     content,
                     headers=[
                         ('Content-Type', 'application/vnd.ms-excel'),
                         ('Content-Disposition', filename_attachment),
-                        ('Content-Length', len(content))                        
-                    ]
+                        ('Content-Length', len(content)),
+                    ],
                 )
-                return response
         except Exception as e:
             se = _serialize_exception(e)
             error = {

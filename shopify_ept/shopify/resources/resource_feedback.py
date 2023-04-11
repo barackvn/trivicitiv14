@@ -7,8 +7,7 @@ class ResourceFeedback(ShopifyResource):
 
     @classmethod
     def _prefix(cls, options={}):
-        product_id = options.get("product_id")
-        if product_id:
-            return "%s/products/%s" % (cls.site, product_id)
+        if product_id := options.get("product_id"):
+            return f"{cls.site}/products/{product_id}"
         else:
             return cls.site

@@ -6,8 +6,7 @@ class Metafield(ShopifyResource):
 
     @classmethod
     def _prefix(cls, options={}):
-        resource = options.get("resource")
-        if resource:
-            return "%s/%s/%s" % (cls.site, resource, options["resource_id"])
+        if resource := options.get("resource"):
+            return f'{cls.site}/{resource}/{options["resource_id"]}'
         else:
             return cls.site

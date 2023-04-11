@@ -8,10 +8,7 @@ class StockScrap(models.Model):
     def action_validate_scrap_wo(self):
         if self.workorder_id:
             order = self.workorder_id.action_open_manufacturing_order()
-            if self.production_id.state == 'done':
-                self.action_validate()
-                return order
-            else:
+            if self.production_id.state != 'done':
                 return {
                     'type': 'ir.actions.act_window',
                     'res_model': 'mrp.production',
@@ -19,4 +16,6 @@ class StockScrap(models.Model):
                     'res_id': self.production_id.id,
                     'target': 'main',
                 }
+            self.action_validate()
+            return order
         return True

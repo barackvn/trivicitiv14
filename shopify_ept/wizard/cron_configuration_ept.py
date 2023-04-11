@@ -247,13 +247,13 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                     'user_id': self.shopify_inventory_export_user_id and self.shopify_inventory_export_user_id.id}
 
             if cron_exist:
-                vals.update({'name': cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 core_cron = self.check_core_shopify_cron("shopify_ept.ir_cron_shopify_auto_export_inventory")
 
-                name = instance.name + ' : ' + core_cron.name
-                vals.update({'name': name})
+                name = f'{instance.name} : {core_cron.name}'
+                vals['name'] = name
                 new_cron = core_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module': 'shopify_ept',
                                                   'name': 'ir_cron_shopify_auto_export_inventory_instance_%d' % (
@@ -290,13 +290,13 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                     'code': "model.import_order_cron_action(ctx={'shopify_instance_id':%d})" % instance.id,
                     'user_id': self.shopify_import_order_user_id and self.shopify_import_order_user_id.id}
             if cron_exist:
-                vals.update({'name': cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 core_cron = self.check_core_shopify_cron("shopify_ept.ir_cron_shopify_auto_import_order")
 
-                name = instance.name + ' : ' + core_cron.name
-                vals.update({'name': name})
+                name = f'{instance.name} : {core_cron.name}'
+                vals['name'] = name
                 new_cron = core_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module': 'shopify_ept',
                                                   'name': 'ir_cron_shopify_auto_import_order_instance_%d' % (
@@ -306,9 +306,8 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                                                   'noupdate': True
                                                   })
 
-        else:
-            if cron_exist:
-                cron_exist.write({'active': False})
+        elif cron_exist:
+            cron_exist.write({'active': False})
         return True
 
     def setup_shopify_update_order_status_cron(self, instance):
@@ -334,13 +333,13 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                     'code': "model.update_order_status_cron_action(ctx={'shopify_instance_id':%d})" % instance.id,
                     'user_id': self.shopify_order_status_user_id and self.shopify_order_status_user_id.id}
             if cron_exist:
-                vals.update({'name': cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 core_cron = self.check_core_shopify_cron("shopify_ept.ir_cron_shopify_auto_update_order_status")
 
-                name = instance.name + ' : ' + core_cron.name
-                vals.update({'name': name})
+                name = f'{instance.name} : {core_cron.name}'
+                vals['name'] = name
                 new_cron = core_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module': 'shopify_ept',
                                                   'name': 'ir_cron_shopify_auto_update_order_status_instance_%d' % (
@@ -379,13 +378,13 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                 'user_id': self.shopify_payout_import_user_id and self.shopify_payout_import_user_id.id}
 
         if cron_exist:
-            vals.update({'name': cron_exist.name})
+            vals['name'] = cron_exist.name
             cron_exist.write(vals)
         else:
             core_cron = self.check_core_shopify_cron("shopify_ept.ir_cron_auto_import_payout_report")
 
-            name = instance.name + ' : ' + core_cron.name
-            vals.update({'name': name})
+            name = f'{instance.name} : {core_cron.name}'
+            vals['name'] = name
             new_cron = core_cron.copy(default=vals)
             self.env['ir.model.data'].create({'module': 'shopify_ept',
                                               'name': 'ir_cron_auto_import_payout_report_instance_%d' % (
@@ -419,13 +418,13 @@ class ShopifyCronConfigurationEpt(models.TransientModel):
                 'code': "model.auto_process_bank_statement(ctx={'shopify_instance_id':%d})" % instance.id,
                 'user_id': self.shopify_auto_process_bank_statement_user_id and self.shopify_auto_process_bank_statement_user_id.id}
         if cron_exist:
-            vals.update({'name': cron_exist.name})
+            vals['name'] = cron_exist.name
             cron_exist.write(vals)
         else:
             core_cron = self.check_core_shopify_cron("shopify_ept.ir_cron_auto_process_bank_statement")
 
-            name = instance.name + ' : ' + core_cron.name
-            vals.update({'name': name})
+            name = f'{instance.name} : {core_cron.name}'
+            vals['name'] = name
             new_cron = core_cron.copy(default=vals)
             self.env['ir.model.data'].create({'module': 'shopify_ept',
                                               'name': 'ir_cron_auto_process_bank_statement_instance_%d' % (

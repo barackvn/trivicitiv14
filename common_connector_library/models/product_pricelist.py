@@ -14,8 +14,9 @@ class ProductPricelist(models.Model):
         :return: price
         Migration done by twinkalc August 2020
         """
-        price = self.get_product_price(product, 1.0, partner=partner, uom_id=product.uom_id.id)
-        return price
+        return self.get_product_price(
+            product, 1.0, partner=partner, uom_id=product.uom_id.id
+        )
 
     def set_product_price_ept(self, product_id, price, min_qty=1):
         """

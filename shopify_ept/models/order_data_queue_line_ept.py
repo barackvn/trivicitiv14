@@ -68,7 +68,7 @@ class ShopifyOrderDataQueueLineEpt(models.Model):
                 order_queue = shopify_order_queue_obj.search([("created_by", "=", created_by), ("state", "=", "draft"),
                                                               ("shopify_instance_id", "=", instance.id)])
                 if order_queue:
-                    message = "Order %s added into Order Queue %s." % (order.get("name"), order_queue.name)
+                    message = f'Order {order.get("name")} added into Order Queue {order_queue.name}.'
                     need_to_create_queue = False
                     _logger.info(message)
             else:
@@ -77,7 +77,7 @@ class ShopifyOrderDataQueueLineEpt(models.Model):
             if need_to_create_queue:
                 order_queue = self.shopify_create_order_queue(instance, created_by)
                 order_queue_list.append(order_queue.id)
-                message = "Order Queue %s created." % order_queue.name
+                message = f"Order Queue {order_queue.name} created."
                 bus_bus_obj.sendone((self._cr.dbname, "res.partner", self.env.user.partner_id.id),
                                     {"type": "simple_notification", "title": "Shopify Connector",
                                      "message": message, "sticky": False, "warning": True})
@@ -87,8 +87,7 @@ class ShopifyOrderDataQueueLineEpt(models.Model):
             data = json.dumps(order)
             try:
                 customer_data = order.get("customer")
-                customer_name = "%s %s" % (customer_data.get("first_name"),
-                                           customer_data.get("last_name"))
+                customer_name = f'{customer_data.get("first_name")} {customer_data.get("last_name")}'
                 customer_email = customer_data.get("email")
                 if customer_name == "None None":
                     customer_name = customer_data.get("default_address").get("name")
@@ -183,14 +182,13 @@ class ShopifyOrderDataQueueLineEpt(models.Model):
         @author: Haresh Mori @Emipro Technologies Pvt.Ltd on date 07/10/2019.
         Task Id : 157350
         """
-        sale_order_obj = self.env["sale.order"]
         common_log_obj = self.env["common.log.book.ept"]
 
         queue_id = self.shopify_order_data_queue_id if len(self.shopify_order_data_queue_id) == 1 else False
         if queue_id:
             instance = queue_id.shopify_instance_id
             if not instance.active:
-                _logger.info("Instance '{}' is not active.".format(instance.name))
+                _logger.info(f"Instance '{instance.name}' is not active.")
                 return True
 
             if queue_id.shopify_order_common_log_book_id:
@@ -203,6 +201,7 @@ class ShopifyOrderDataQueueLineEpt(models.Model):
                                                      "model_id": model_id})
 
             queue_id.is_process_queue = True
+            sale_order_obj = self.env["sale.order"]
             # Below two line used for When the update order webhook calls.
             if update_order or queue_id.created_by == "webhook":
                 sale_order_obj.update_shopify_order(self, log_book_id)

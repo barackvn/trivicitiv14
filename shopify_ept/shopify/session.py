@@ -50,7 +50,7 @@ class Session(object):
     def create_permission_url(self, scope, redirect_uri, state=None):
         query_params = dict(client_id=self.api_key, scope=",".join(scope), redirect_uri=redirect_uri)
         if state: query_params['state'] = state
-        return "https://%s/admin/oauth/authorize?%s" % (self.url, urllib.parse.urlencode(query_params))
+        return f"https://{self.url}/admin/oauth/authorize?{urllib.parse.urlencode(query_params)}"
 
     def request_token(self, params):
         if self.token:
@@ -61,16 +61,15 @@ class Session(object):
 
         code = params['code']
 
-        url = "https://%s/admin/oauth/access_token?" % self.url
+        url = f"https://{self.url}/admin/oauth/access_token?"
         query_params = dict(client_id=self.api_key, client_secret=self.secret, code=code)
         request = urllib.request.Request(url, urllib.parse.urlencode(query_params).encode('utf-8'))
         response = urllib.request.urlopen(request)
 
-        if response.code == 200:
-            self.token = json.loads(response.read().decode('utf-8'))['access_token']
-            return self.token
-        else:
+        if response.code != 200:
             raise Exception(response.msg)
+        self.token = json.loads(response.read().decode('utf-8'))['access_token']
+        return self.token
 
     @property
     def api_version(self):
@@ -78,7 +77,7 @@ class Session(object):
 
     @property
     def site(self):
-        return self.version.api_path("%s://%s" % (self.protocol, self.url))
+        return self.version.api_path(f"{self.protocol}://{self.url}")
 
     @property
     def valid(self):
@@ -89,17 +88,17 @@ class Session(object):
         if not url or (url.strip() == ""):
             return None
         url = re.sub("^https?://", "", url)
-        shop = urllib.parse.urlparse("https://" + url).hostname
+        shop = urllib.parse.urlparse(f"https://{url}").hostname
         if shop is None:
             return None
         idx = shop.find(".")
         if idx != -1:
-            shop = shop[0:idx]
+            shop = shop[:idx]
         if len(shop) == 0:
             return None
-        shop += "." + cls.myshopify_domain
+        shop += f".{cls.myshopify_domain}"
         if cls.port:
-            shop += ":" + str(cls.port)
+            shop += f":{str(cls.port)}"
         return shop
 
     @classmethod

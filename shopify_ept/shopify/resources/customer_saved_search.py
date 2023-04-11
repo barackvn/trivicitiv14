@@ -4,5 +4,5 @@ from .customer import Customer
 
 class CustomerSavedSearch(ShopifyResource):
 
-    def customers(cls, **kwargs):
-        return Customer._build_collection(cls.get("customers", **kwargs))
+    def customers(self, **kwargs):
+        return Customer._build_collection(self.get("customers", **kwargs))

@@ -6,13 +6,13 @@ import json
 class GraphQL():
 
     def __init__(self):
-        self.endpoint = (shopify.ShopifyResource.get_site() + "/graphql.json")
+        self.endpoint = f"{shopify.ShopifyResource.get_site()}/graphql.json"
         self.headers = shopify.ShopifyResource.get_headers()
 
     def merge_headers(self, *headers):
         merged_headers = {}
         for header in headers:
-            merged_headers.update(header)
+            merged_headers |= header
         return merged_headers
 
     def execute(self, query, variables=None):

@@ -35,9 +35,8 @@ class SaleOrder(models.Model):
         @author: Maulik Barad on Date 11-Sep-2020.
         """
         partner, delivery_address, invoice_address = super(SaleOrder, self).prepare_shopify_customer_and_addresses(order_response, pos_order, instance, order_data_line, log_book)
-        if partner and not (delivery_address or invoice_address):
-            message = "Customer's Shipping or invoice details are not available in %s Order." % (
-                order_response.get("order_number"))
+        if partner and not delivery_address and not invoice_address:
+            message = f"""Customer's Shipping or invoice details are not available in {order_response.get("order_number")} Order."""
             self.create_shopify_log_line(message, order_data_line, log_book, order_response.get("name"))
             _logger.info(message)
             return partner, False, False
@@ -67,15 +66,17 @@ class SaleOrder(models.Model):
                 order_data = order_data_line.order_data
                 order_response = json.loads(order_data)
             else:
-                if not isinstance(order_data_line, dict):
-                    order_response = order_data_line.to_dict()
-                else:
-                    order_response = order_data_line
+                order_response = (
+                    order_data_line
+                    if isinstance(order_data_line, dict)
+                    else order_data_line.to_dict()
+                )
                 order_data_line = False
 
             order_number = order_response.get("order_number")
-            _logger.info("Started processing Shopify order(%s) and order id is(%s)"
-                         % (order_number, order_response.get("id")))
+            _logger.info(
+                f'Started processing Shopify order({order_number}) and order id is({order_response.get("id")})'
+            )
             sale_order = self.search([("shopify_order_id", "=", order_response.get("id")),
                                       ("shopify_instance_id", "=", instance.id),
                                       ("shopify_order_number", "=", order_number)])
@@ -88,11 +89,12 @@ class SaleOrder(models.Model):
                     order_data_line.write({"state": "done", "processed_at": datetime.now(),
                                            "sale_order_id": sale_order.id})
                     self._cr.commit()
-                _logger.info("Done the Process of order Because Shopify Order(%s) is exist in Odoo and "
-                             "Odoo order is(%s)" % (order_number, sale_order.name))
+                _logger.info(
+                    f"Done the Process of order Because Shopify Order({order_number}) is exist in Odoo and Odoo order is({sale_order.name})"
+                )
                 continue
 
-            pos_order = True if order_response.get("source_name", "") == "pos" else False
+            pos_order = order_response.get("source_name", "") == "pos"
             partner, delivery_address, invoice_address = self.prepare_shopify_customer_and_addresses(
                 order_response, pos_order, instance, order_data_line, log_book)
             if not partner or not delivery_address or not invoice_address:
@@ -100,8 +102,9 @@ class SaleOrder(models.Model):
 
             lines = order_response.get("line_items")
             if self.check_mismatch_details(lines, instance, order_number, order_data_line, log_book):
-                _logger.info("Mismatch details found in this Shopify Order(%s) and id (%s)" % (
-                    order_number, order_response.get("id")))
+                _logger.info(
+                    f'Mismatch details found in this Shopify Order({order_number}) and id ({order_response.get("id")})'
+                )
                 if order_data_line:
                     order_data_line.write({"state": "failed", "processed_at": datetime.now()})
                 continue
@@ -109,8 +112,7 @@ class SaleOrder(models.Model):
             sale_order = self.shopify_create_order(instance, partner, delivery_address, invoice_address,
                                                    order_data_line, order_response, log_book)
             if not sale_order:
-                message = "Configuration missing in Odoo while importing Shopify Order(%s) and id (%s)" % (
-                    order_number, order_response.get("id"))
+                message = f'Configuration missing in Odoo while importing Shopify Order({order_number}) and id ({order_response.get("id")})'
                 _logger.info(message)
                 self.create_shopify_log_line(message, order_data_line, log_book, order_response.get("name"))
                 continue
@@ -119,25 +121,29 @@ class SaleOrder(models.Model):
             location_vals = self.set_shopify_location_and_warehouse(order_response, instance, pos_order)
             sale_order.write(location_vals)
 
-            risk_result = shopify.OrderRisk().find(order_id=order_response.get("id"))
-            if risk_result:
+            if risk_result := shopify.OrderRisk().find(
+                order_id=order_response.get("id")
+            ):
                 order_risk_obj.shopify_create_risk_in_order(risk_result, sale_order)
                 risk = sale_order.risk_ids.filtered(lambda x: x.recommendation != "accept")
                 if risk:
                     sale_order.is_risky_order = True
 
-            _logger.info("Creating order lines for Odoo order(%s) and Shopify order is (%s)." % (
-                sale_order.name, order_number))
+            _logger.info(
+                f"Creating order lines for Odoo order({sale_order.name}) and Shopify order is ({order_number})."
+            )
             sale_order.create_shopify_order_lines(lines, order_response, instance)
 
-            _logger.info("Created order lines for Odoo order(%s) and Shopify order is (%s)"
-                         % (sale_order.name, order_number))
+            _logger.info(
+                f"Created order lines for Odoo order({sale_order.name}) and Shopify order is ({order_number})"
+            )
 
             sale_order.create_shopify_shipping_lines(order_response, instance)
-            _logger.info("Created Shipping lines for order (%s)." % sale_order.name)
+            _logger.info(f"Created Shipping lines for order ({sale_order.name}).")
 
-            _logger.info("Starting auto workflow process for Odoo order(%s) and Shopify order is (%s)"
-                         % (sale_order.name, order_number))
+            _logger.info(
+                f"Starting auto workflow process for Odoo order({sale_order.name}) and Shopify order is ({order_number})"
+            )
 
             if not sale_order.is_risky_order:
                 if sale_order.shopify_order_status == "fulfilled":
@@ -145,13 +151,15 @@ class SaleOrder(models.Model):
                 else:
                     sale_order.process_orders_and_invoices_ept()
 
-            _logger.info("Done auto workflow process for Odoo order(%s) and Shopify order is (%s)"
-                         % (sale_order.name, order_number))
+            _logger.info(
+                f"Done auto workflow process for Odoo order({sale_order.name}) and Shopify order is ({order_number})"
+            )
 
             if order_data_line:
                 order_data_line.write({"state": "done", "processed_at": datetime.now(),
                                        "sale_order_id": sale_order.id})
-            _logger.info("Processed the Odoo Order %s process and Shopify Order (%s)"
-                         % (sale_order.name, order_number))
+            _logger.info(
+                f"Processed the Odoo Order {sale_order.name} process and Shopify Order ({order_number})"
+            )
 
         return order_ids

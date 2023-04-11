@@ -25,15 +25,19 @@ class ProductImageEpt(models.Model):
                 shopify_variants = self.env['shopify.product.product.ept'].search_read(
                     [('product_id', '=', vals.get("product_id"))], ["id", "shopify_template_id"])
                 for shopify_variant in shopify_variants:
-                    shopify_product_image_vals.update({"shopify_variant_id": shopify_variant["id"],
-                                                       "shopify_template_id": shopify_variant["shopify_template_id"][0],
-                                                       "sequence": 0})
+                    shopify_product_image_vals |= {
+                        "shopify_variant_id": shopify_variant["id"],
+                        "shopify_template_id": shopify_variant[
+                            "shopify_template_id"
+                        ][0],
+                        "sequence": 0,
+                    }
                     shopify_product_image_obj.create(shopify_product_image_vals)
             elif vals.get("template_id", False):
                 shopify_templates = self.env["shopify.product.template.ept"].search_read(
                     [("product_tmpl_id", "=", vals.get("template_id"))], ["id"])
                 for shopify_template in shopify_templates:
-                    shopify_product_image_vals.update({'shopify_template_id': shopify_template["id"]})
+                    shopify_product_image_vals['shopify_template_id'] = shopify_template["id"]
                     shopify_product_image_obj.create(shopify_product_image_vals)
         return result
 
@@ -52,9 +56,18 @@ class ProductImageEpt(models.Model):
                     shopify_product_images.write({'shopify_variant_id': False})
                 elif vals.get("product_id", ""):
                     for shopify_product_image in shopify_product_images:
-                        shopify_variant = self.env["shopify.product.product.ept"].search_read(
-                            [("product_id", "=", vals.get("product_id")),
-                             ("shopify_template_id", "=", shopify_product_image.shopify_template_id.id)], ["id"])
-                        if shopify_variant:
+                        if shopify_variant := self.env[
+                            "shopify.product.product.ept"
+                        ].search_read(
+                            [
+                                ("product_id", "=", vals.get("product_id")),
+                                (
+                                    "shopify_template_id",
+                                    "=",
+                                    shopify_product_image.shopify_template_id.id,
+                                ),
+                            ],
+                            ["id"],
+                        ):
                             shopify_product_image.write({"shopify_variant_id": shopify_variant["id"]})
         return result

@@ -47,11 +47,15 @@ class ReportExcelWizard(models.TransientModel):
     def create(self, values):
         result = super(ReportExcelWizard, self).create(values)
         for key, val in result._fields.items():
-            field = val
             key_split = key.split('_')
-            if len(key_split) > 2:
-                if key_split[0] == 'x' and key_split[1] == 'param' and int(key_split[2]) == self._context.get('id'):
-                    field.inverse = 'compute_'
+            if (
+                len(key_split) > 2
+                and key_split[0] == 'x'
+                and key_split[1] == 'param'
+                and int(key_split[2]) == self._context.get('id')
+            ):
+                field = val
+                field.inverse = 'compute_'
         if len(values):
             for k,v in list(values.items()):
                 if k != 'data':
@@ -67,52 +71,55 @@ class ReportExcelWizard(models.TransientModel):
         self._compute(record)
         return result
     def _compute(self, records=None):
-        records = self if not records else records
+        records = records or self
         for record in records:
             for key, val in list(record._fields.items()):
                 key_split = key.split('_')
-                if len(key_split) > 2:
-                    if key_split[0] == 'x' and key_split[1] == 'param' and int(key_split[2]) == record.env.context.get('id'):
-                        field = record._fields.get(key)
-                        values = record['data']
-                        value = values.get(field.name)
-                        rec_val = field.convert_to_read(record[field.name], record, use_name_get=False)
-                        if type(rec_val) is date:
-                            rec_val = rec_val.strftime(DEFAULT_SERVER_DATE_FORMAT)
-                        if type(rec_val) is datetime:
-                            rec_val = rec_val.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
-                        if isinstance(rec_val, list) and value is not None:
-                            value.sort()
-                            rec_val.sort()
-                        if rec_val != value and field.name in values:
-                            record[field.name] = [[6, False, values.get(field.name)]] if isinstance(rec_val, list) else values.get(field.name) 
-                            if field.relational:
-                                record[field.name] = record[field.name].exists()
+                if (
+                    len(key_split) > 2
+                    and key_split[0] == 'x'
+                    and key_split[1] == 'param'
+                    and int(key_split[2]) == record.env.context.get('id')
+                ):
+                    field = record._fields.get(key)
+                    values = record['data']
+                    value = values.get(field.name)
+                    rec_val = field.convert_to_read(record[field.name], record, use_name_get=False)
+                    if type(rec_val) is date:
+                        rec_val = rec_val.strftime(DEFAULT_SERVER_DATE_FORMAT)
+                    if type(rec_val) is datetime:
+                        rec_val = rec_val.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+                    if isinstance(rec_val, list) and value is not None:
+                        value.sort()
+                        rec_val.sort()
+                    if rec_val != value and field.name in values:
+                        record[field.name] = [[6, False, values.get(field.name)]] if isinstance(rec_val, list) else values.get(field.name) 
+                        if field.relational:
+                            record[field.name] = record[field.name].exists()
     def compute_(self, field=None, records=None, val=None):
-        if records:
-            for record in records:
-                values = record['data']
-                if isinstance(val, list):
-                    value = val[0][2] if val else val
-                else:
-                    value = val
-                if type(val) is date:
-                    value = val.strftime(DEFAULT_SERVER_DATE_FORMAT)
-                if type(val) is datetime:
-                    value = val.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
-                if value:
-                    if isinstance(value, list) and values.get(field.name) is not None:
-                        if sorted(values.get(field.name)) != sorted(value):
-                            values[field.name] = value
-                            record['data'] = values
-                    else:
-                        if values.get(field.name) != value:
-                            values[field.name] = value
-                            record['data'] = values
-                else:
-                    if field.name in values:
-                        values.pop(field.name)
+        if not records:
+            return
+        for record in records:
+            values = record['data']
+            if isinstance(val, list):
+                value = val[0][2] if val else val
+            else:
+                value = val
+            if type(val) is date:
+                value = val.strftime(DEFAULT_SERVER_DATE_FORMAT)
+            if type(val) is datetime:
+                value = val.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+            if value:
+                if isinstance(value, list) and values.get(field.name) is not None:
+                    if sorted(values.get(field.name)) != sorted(value):
+                        values[field.name] = value
                         record['data'] = values
+                elif values.get(field.name) != value:
+                    values[field.name] = value
+                    record['data'] = values
+            elif field.name in values:
+                values.pop(field.name)
+                record['data'] = values
     @api.model
     def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
         res = super(ReportExcelWizard, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
@@ -121,26 +128,30 @@ class ReportExcelWizard(models.TransientModel):
             placeholder = eview.xpath("group[@name='placeholder']")
             if len(placeholder):
                 placeholder = placeholder[0]
-                params = self.env['report.excel.param'].search([('report_excel_id', '=', self.env.context.get('id'))])            
-                if params:
+                if params := self.env['report.excel.param'].search(
+                    [('report_excel_id', '=', self.env.context.get('id'))]
+                ):
                     for param in params:
                         param_field = self.env['ir.model.fields'].search([('id', '=', param.wizard_param_ir_model_field_id.id )])
                         if len(param_field):
                             name = param_field['name']
                             name_split = name.split('_')
-                            if len(name_split) > 2:
-                                if name_split[0] == 'x' and name_split[1] == 'param':
-                                    if param_field.ttype == 'many2one':
-                                        node = etree.SubElement(placeholder, 'field', {'name': name, 'options':"{'no_open': True, 'no_create': True}"})
-                                    elif param_field.ttype == 'many2many':
-                                        node = etree.SubElement(placeholder, 'field', {'name': name, 'widget':"many2many_tags", 'options':"{'no_open': True, 'no_create': True}"})
-                                    else:
-                                        node = etree.SubElement(placeholder, 'field', name=name)
+                            if (
+                                len(name_split) > 2
+                                and name_split[0] == 'x'
+                                and name_split[1] == 'param'
+                            ):
+                                if param_field.ttype == 'many2one':
+                                    node = etree.SubElement(placeholder, 'field', {'name': name, 'options':"{'no_open': True, 'no_create': True}"})
+                                elif param_field.ttype == 'many2many':
+                                    node = etree.SubElement(placeholder, 'field', {'name': name, 'widget':"many2many_tags", 'options':"{'no_open': True, 'no_create': True}"})
+                                else:
+                                    node = etree.SubElement(placeholder, 'field', name=name)
             if self.env['report.excel'].browse(self.env.context.get('id')).send_email:
                 node_button_print = eview.xpath(".//button[@name='export_excel']")[0]
                 node_footer = node_button_print.getparent()
                 node_footer.insert(node_footer.index(node_button_print)+1, etree.SubElement(node_footer, 'button', {'name': 'export_excel',  'string': 'Send by Email',  'type':'object', 'class':'btn-primary', 'context':'{"send_by_email": True}'}))
-            [res.get('fields').update({e[0]:e[1]}) for e in list(self.env['ir.ui.view'].postprocess_and_fields(eview, self._name, False)[1].items()) if e[0] not in res.get('fields')] 
+            [res.get('fields').update({e[0]:e[1]}) for e in list(self.env['ir.ui.view'].postprocess_and_fields(eview, self._name, False)[1].items()) if e[0] not in res.get('fields')]
             res['arch'] = etree.tostring(eview, encoding='unicode')
         return res
 class CellUtils(object):

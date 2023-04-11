@@ -37,7 +37,7 @@ class SaleOrder(models.Model):
 
     @api.depends('company_id')
     def _compute_is_commission_apply(self):
-        for rec in self:
+        for _ in self:
             self.is_commission_apply = True
 
     def action_view_expense(self):
@@ -77,11 +77,9 @@ class SaleOrder(models.Model):
         if len(sheets) > 1:
             action_vals['view_mode'] = 'tree,form'
             return action_vals
-        # 1张 e报告
         elif len(sheets) == 1:
-            action_vals.update({'res_id': sheets[0].id, 'view_mode': 'form'})
+            action_vals |= {'res_id': sheets[0].id, 'view_mode': 'form'}
             return action_vals
-        # 无 e 报告
         else:
             exps = self.sale_commission_line_ids.create_commission_expense()
             # create 报销整合单
@@ -89,7 +87,7 @@ class SaleOrder(models.Model):
                 action = exps.action_submit_expenses()
                 new_context = action.get('context') or {}
                 try:
-                    new_context.update({'default_name': '%s:%s' % (self.name, product.name)})
+                    new_context.update({'default_name': f'{self.name}:{product.name}'})
                 except Exception as e:
                     pass
                 action['context'] = json.dumps(new_context, ensure_ascii=False)
@@ -107,16 +105,14 @@ class SaleOrder(models.Model):
         for rec in self:
             if rec.sale_commission_line_ids:
                 rec.sale_commission_line_ids.unlink()
-            commission_amount_on = rec.commission_amount_on
             ids = False
-            sale_commission = []
-            line = self.env['sale.commission.line']
             if self.team_id and self.commission_rule_on == 'sales_team':
                 ids = self.team_id.sale_commission_rule_ids
-            elif self.team_id and self.commission_rule_on == 'sales_team':
-                ids = self.partner_id.sale_commission_rule_ids
             if ids:
                 rec.sale_commission_line_ids = None
+                commission_amount_on = rec.commission_amount_on
+                sale_commission = []
+                line = self.env['sale.commission.line']
                 for rule in ids:
                     user_id = False
                     amount = 0
@@ -158,9 +154,9 @@ class SaleOrder(models.Model):
 
     def action_cancel(self):
         res = super(SaleOrder, self).action_cancel()
-        for rec in self:
+        for _ in self:
             for line in self.sale_commission_line_ids:
-                if line.state == 'draft' or line.state == 'cancel':
+                if line.state in ['draft', 'cancel']:
                     line.state = 'exception'
                 elif line.state in ('paid', 'invoice'):
                     raise UserError(
@@ -168,13 +164,4 @@ class SaleOrder(models.Model):
         return res
 
     def _prepare_invoice(self):
-        vals = super(SaleOrder, self)._prepare_invoice()
-        # if self.sale_commission_line_ids:
-        #     sale_commission_lines = []
-        #     for commission in self.sale_commission_line_ids:
-        #         sale_commission_lines.append((0, 0, {
-        #             'level_id': commission.level_id.id,
-        #             'user_id': commission.user_id and commission.user_id.id or False,
-        #             'percentage': commission.percentage}))
-        #     vals.update({'sale_commission_line_ids': sale_commission_lines})
-        return vals
+        return super(SaleOrder, self)._prepare_invoice()

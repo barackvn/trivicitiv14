@@ -34,17 +34,20 @@ class PrepareProductForExport(models.TransientModel):
         If "csv" is selected, then it will export product data in CSV file, if user want to do some
         modification in name, description, etc. before importing into Shopify.
         """
-        _logger.info("Starting product exporting via %s method..." % self.export_method)
+        _logger.info(f"Starting product exporting via {self.export_method} method...")
 
         active_template_ids = self._context.get("active_ids", [])
         templates = self.env["product.template"].browse(active_template_ids)
-        product_templates = templates.filtered(lambda template: template.type == "product")
-        if not product_templates:
+        if product_templates := templates.filtered(
+            lambda template: template.type == "product"
+        ):
+            return (
+                self.export_direct_in_shopify(product_templates)
+                if self.export_method == "direct"
+                else self.export_csv_file(product_templates)
+            )
+        else:
             raise UserError("It seems like selected products are not Storable products.")
-
-        if self.export_method == "direct":
-            return self.export_direct_in_shopify(product_templates)
-        return self.export_csv_file(product_templates)
 
     def export_direct_in_shopify(self, product_templates):
         """
@@ -82,24 +85,23 @@ class PrepareProductForExport(models.TransientModel):
                 shopify_template = shopify_template_obj.create(shopify_product_template_vals)
                 sequence = 1
                 shopify_template_id = shopify_template.id
-            else:
-                if shopify_template_id != shopify_template.id:
-                    shopify_product_template_vals = (
-                        {"product_tmpl_id": product_template.id,
-                         "shopify_instance_id": shopify_instance.id,
-                         "shopify_product_category": product_template.categ_id.id,
-                         "name": product_template.name,
-                         "description": variant.description_sale
-                         })
-                    shopify_template.write(shopify_product_template_vals)
-                    shopify_template_id = shopify_template.id
+            elif shopify_template_id != shopify_template.id:
+                shopify_product_template_vals = (
+                    {"product_tmpl_id": product_template.id,
+                     "shopify_instance_id": shopify_instance.id,
+                     "shopify_product_category": product_template.categ_id.id,
+                     "name": product_template.name,
+                     "description": variant.description_sale
+                     })
+                shopify_template.write(shopify_product_template_vals)
+                shopify_template_id = shopify_template.id
             if shopify_template not in shopify_templates:
                 shopify_templates += shopify_template
 
             self.create_shopify_template_images(shopify_template)
 
             if shopify_template and shopify_template.shopify_product_ids and \
-                    shopify_template.shopify_product_ids[0].sequence:
+                        shopify_template.shopify_product_ids[0].sequence:
                 sequence += 1
 
             shopify_variant = shopify_product_obj.search([
@@ -130,10 +132,10 @@ class PrepareProductForExport(models.TransientModel):
         """
         buffer = StringIO()
 
-        delimiter = ","
         field_names = ["template_name", "product_name", "product_default_code",
                        "shopify_product_default_code", "product_description",
                        "PRODUCT_TEMPLATE_ID", "PRODUCT_ID", "CATEGORY_ID"]
+        delimiter = ","
         csv_writer = DictWriter(buffer, field_names, delimiter=delimiter)
         csv_writer.writer.writerow(field_names)
 
@@ -170,9 +172,8 @@ class PrepareProductForExport(models.TransientModel):
 
         return {
             "type": "ir.actions.act_url",
-            "url": "web/content/?model=shopify.prepare.product.for.export.ept&id=%s&field=choose_file&download=true&"
-                   "filename=%s.csv" % (self.id, self.file_name + str(datetime.now().strftime("%d/%m/%Y:%H:%M:%S"))),
-            "target": self
+            "url": f'web/content/?model=shopify.prepare.product.for.export.ept&id={self.id}&field=choose_file&download=true&filename={self.file_name + str(datetime.now().strftime("%d/%m/%Y:%H:%M:%S"))}.csv',
+            "target": self,
         }
 
     def create_shopify_template_images(self, shopify_template):
@@ -204,8 +205,7 @@ class PrepareProductForExport(models.TransientModel):
         """
         shopify_product_image_obj = self.env["shopify.product.image.ept"]
         product_id = shopify_variant.product_id
-        odoo_image = product_id.ept_image_ids
-        if odoo_image:
+        if odoo_image := product_id.ept_image_ids:
             shopify_product_image = shopify_product_image_obj.search_read(
                 [("shopify_template_id", "=", shopify_template.id),
                  ("shopify_variant_id", "=", shopify_variant.id),

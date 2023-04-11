@@ -34,8 +34,7 @@ class ShopifyInstanceEpt(models.Model):
         Gives default discount product to set in imported shopify order.
         @author: Haresh Mori on Date 16-Dec-2019.
         """
-        discount_product = self.env.ref('shopify_ept.shopify_discount_product') or False
-        return discount_product
+        return self.env.ref('shopify_ept.shopify_discount_product') or False
 
     @api.model
     def _default_shipping_product(self):
@@ -43,8 +42,7 @@ class ShopifyInstanceEpt(models.Model):
         Sets default shipping product.
         @author: Maulik Barad on Date 01-Oct-2020.
         """
-        shipping_product = self.env.ref('shopify_ept.shopify_shipping_product') or False
-        return shipping_product
+        return self.env.ref('shopify_ept.shopify_shipping_product') or False
 
     def _count_all(self):
         for instance in self:
@@ -73,8 +71,13 @@ class ShopifyInstanceEpt(models.Model):
                 instance.picking_ids.filtered(lambda x: x.state == 'partially_available'))
             instance.done_picking_count = len(
                 instance.picking_ids.filtered(lambda x: x.state == 'done'))
-            instance.open_invoice_count = len(instance.invoice_ids.filtered(
-                lambda x: x.state == 'posted' and x.move_type == 'out_invoice' and not x.payment_state == 'paid'))
+            instance.open_invoice_count = len(
+                instance.invoice_ids.filtered(
+                    lambda x: x.state == 'posted'
+                    and x.move_type == 'out_invoice'
+                    and x.payment_state != 'paid'
+                )
+            )
             instance.paid_invoice_count = len(instance.invoice_ids.filtered(
                 lambda x: x.state == 'posted' and x.payment_state in ['paid',
                                                                       'in_payment'] and x.move_type == 'out_invoice'))
@@ -223,7 +226,10 @@ class ShopifyInstanceEpt(models.Model):
             vals["shopify_host"] = vals.get("shopify_host").rstrip('/')
 
         res_partner_obj = self.env["res.partner"]
-        customer_vals = {"name": "POS Customer(%s)" % vals.get("name"), "customer_rank": 1}
+        customer_vals = {
+            "name": f'POS Customer({vals.get("name")})',
+            "customer_rank": 1,
+        }
         customer = res_partner_obj.create(customer_vals)
 
         sales_team = self.create_sales_channel(vals.get('name'))
@@ -282,9 +288,9 @@ class ShopifyInstanceEpt(models.Model):
 
         shop = self.shopify_host.split("//")
         if len(shop) == 2:
-            shop_url = shop[0] + "//" + api_key + ":" + password + "@" + shop[1] + "/admin/api/2020-07"
+            shop_url = f"{shop[0]}//{api_key}:{password}@{shop[1]}/admin/api/2020-07"
         else:
-            shop_url = "https://" + api_key + ":" + password + "@" + shop[0] + "/admin/api/2020-07"
+            shop_url = f"https://{api_key}:{password}@{shop[0]}/admin/api/2020-07"
 
         shopify.ShopifyResource.set_site(shop_url)
         return True
@@ -307,7 +313,6 @@ class ShopifyInstanceEpt(models.Model):
         shopify_template_obj = self.env["shopify.product.template.ept"]
         sale_auto_workflow_configuration_obj = self.env["sale.auto.workflow.configuration.ept"]
         shopify_payment_gateway_obj = self.env["shopify.payment.gateway.ept"]
-        shopify_webhook_obj = self.env["shopify.webhook.ept"]
         shopify_location_obj = self.env["shopify.location.ept"]
         if self.active:
             activate = {"active": False}
@@ -315,6 +320,7 @@ class ShopifyInstanceEpt(models.Model):
 
             self.write(activate)
             self.change_auto_cron_status(self)
+            shopify_webhook_obj = self.env["shopify.webhook.ept"]
             shopify_webhook_obj.search(domain_for_webhook_location).unlink()
             shopify_location_obj.search(domain_for_webhook_location).write(activate)
         else:
@@ -394,12 +400,12 @@ class ShopifyInstanceEpt(models.Model):
         @author: Angel Patel on Date 17/01/2020.
         """
         topic_list = []
-        if event == 'product':
-            topic_list = ["products/update", "products/delete"]
         if event == 'customer':
             topic_list = ["customers/create", "customers/update"]
-        if event == 'order':
+        elif event == 'order':
             topic_list = ["orders/updated"]
+        elif event == 'product':
+            topic_list = ["products/update", "products/delete"]
         return topic_list
 
     def configure_shopify_product_webhook(self):
@@ -447,20 +453,24 @@ class ShopifyInstanceEpt(models.Model):
 
         # self.refresh_webhooks(available_webhooks)
 
-        if getattr(self, "create_shopify_%s_webhook" % resource):
+        if getattr(self, f"create_shopify_{resource}_webhook"):
             if available_webhooks:
                 available_webhooks.write({'state': 'active'})
                 _logger.info("{0} Webhooks are activated of instance '{1}'.".format(resource, self.name))
                 topic_list = list(set(topic_list) - set(available_webhooks.mapped("webhook_action")))
 
             for topic in topic_list:
-                webhook_obj.create({"webhook_name": self.name + "_" + topic.replace("/", "_"),
-                                    "webhook_action": topic, "instance_id": instance_id})
+                webhook_obj.create(
+                    {
+                        "webhook_name": f"{self.name}_" + topic.replace("/", "_"),
+                        "webhook_action": topic,
+                        "instance_id": instance_id,
+                    }
+                )
                 _logger.info("Webhook for '{0}' of instance '{1}' created.".format(topic, self.name))
-        else:
-            if available_webhooks:
-                available_webhooks.write({'state': 'inactive'})
-                _logger.info("{0} Webhooks are paused of instance '{1}'.".format(resource, self.name))
+        elif available_webhooks:
+            available_webhooks.write({'state': 'inactive'})
+            _logger.info("{0} Webhooks are paused of instance '{1}'.".format(resource, self.name))
 
     def refresh_webhooks(self):
         """
@@ -470,16 +480,18 @@ class ShopifyInstanceEpt(models.Model):
         self.connect_in_shopify()
         shopify_webhook = shopify.Webhook()
         responses = shopify_webhook.find()
-        webhook_ids = []
-        for webhook in responses:
-            webhook_ids.append(str(webhook.id))
-        _logger.info("Emipro-Webhook: Current webhook present in shopify is %s" % webhook_ids)
+        webhook_ids = [str(webhook.id) for webhook in responses]
+        _logger.info(
+            f"Emipro-Webhook: Current webhook present in shopify is {webhook_ids}"
+        )
         webhook_obj = self.env['shopify.webhook.ept'].search(
             [('instance_id', '=', self.id), ('webhook_id', 'not in', webhook_ids)])
-        _logger.info("Emipro-Webhook: Webhook not present in odoo is %s" % webhook_obj)
+        _logger.info(f"Emipro-Webhook: Webhook not present in odoo is {webhook_obj}")
         if webhook_obj:
             for webhooks in webhook_obj:
-                _logger.info("Emipro-Webhook: deleting the %s shopify.webhook.ept record" % webhooks.id)
+                _logger.info(
+                    f"Emipro-Webhook: deleting the {webhooks.id} shopify.webhook.ept record"
+                )
                 self._cr.execute("DELETE FROM shopify_webhook_ept WHERE id = %s", [webhooks.id], log_exceptions=False)
         _logger.info("Emipro-Webhook: refresh process done")
         return True

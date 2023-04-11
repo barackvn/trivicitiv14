@@ -81,22 +81,36 @@ class SaleWorkflowProcess(models.Model):
         """
         sale_order_obj = self.env['sale.order']
         workflow_process_obj = self.env['sale.workflow.process.ept']
-        if not auto_workflow_process_id:
-            work_flow_process_records = workflow_process_obj.search([])
-        else:
-            work_flow_process_records = workflow_process_obj.browse(auto_workflow_process_id)
-
+        work_flow_process_records = (
+            workflow_process_obj.browse(auto_workflow_process_id)
+            if auto_workflow_process_id
+            else workflow_process_obj.search([])
+        )
         for work_flow_process_record in work_flow_process_records:
-            if not ids:
-                orders = \
-                    sale_order_obj. \
-                        search([('auto_workflow_process_id', '=', work_flow_process_record.id),
-                                ('state', 'not in', ('done', 'cancel', 'sale')),
-                                ('invoice_status', '!=', 'invoiced')])
-            else:
-                orders = sale_order_obj.search(
-                    [('auto_workflow_process_id', '=', work_flow_process_record.id),
-                     ('id', 'in', ids)])
+            orders = (
+                sale_order_obj.search(
+                    [
+                        (
+                            'auto_workflow_process_id',
+                            '=',
+                            work_flow_process_record.id,
+                        ),
+                        ('id', 'in', ids),
+                    ]
+                )
+                if ids
+                else sale_order_obj.search(
+                    [
+                        (
+                            'auto_workflow_process_id',
+                            '=',
+                            work_flow_process_record.id,
+                        ),
+                        ('state', 'not in', ('done', 'cancel', 'sale')),
+                        ('invoice_status', '!=', 'invoiced'),
+                    ]
+                )
+            )
             if not orders:
                 continue
             orders.process_orders_and_invoices_ept()
@@ -127,15 +141,19 @@ class SaleWorkflowProcess(models.Model):
                 order.auto_shipped_order_ept(customers_location, mrp_module)
                 ###################delivered quantity configuration lines will be proceed#########
                 delivered_lines = order.mapped('order_line'). \
-                    filtered(lambda l: l.product_id.invoice_policy != 'order')
-                if (order.mapped('order_line').filtered(
-                        lambda l: l.product_id.invoice_policy != 'order')) or delivered_lines:
-                    if self.create_invoice:
-                        invoices = order._create_invoices()
-                        if invoices:
-                            order.validate_invoice_ept(invoices)
-                            if self.register_payment:
-                                order.paid_invoice_ept(invoices)
-                #################################################################################
+                        filtered(lambda l: l.product_id.invoice_policy != 'order')
+                if (
+                    (
+                        order.mapped('order_line').filtered(
+                            lambda l: l.product_id.invoice_policy != 'order'
+                        )
+                    )
+                    or delivered_lines
+                ) and self.create_invoice:
+                    if invoices := order._create_invoices():
+                        order.validate_invoice_ept(invoices)
+                        if self.register_payment:
+                            order.paid_invoice_ept(invoices)
+                        #################################################################################
 
         return True

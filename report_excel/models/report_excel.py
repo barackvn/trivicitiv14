@@ -94,32 +94,45 @@ See bellow Legends for supported Date and Time Formats.
     @api.depends('data')
     def _compute_attached_doc_name(self):
         Attachment = self.env['ir.attachment']
-        datafile = Attachment.search_read([
-            '&', ('res_model', '=', 'report.excel'), ('res_id', '=', self.id), ('res_field', '=', 'data')
-            ])
-        if datafile:
+        if datafile := Attachment.search_read(
+            [
+                '&',
+                ('res_model', '=', 'report.excel'),
+                ('res_id', '=', self.id),
+                ('res_field', '=', 'data'),
+            ]
+        ):
             return datafile[0]['name']
     def _compute_id(self):
         self.report_id = self.id 
     @api.depends('report_excel_param_ids')
     def _compute_report_excel_param_content(self):
         params = ''
-        if isinstance(self.id, models.NewId):
-            self.report_excel_param_content = params
-        else:
+        if not isinstance(self.id, models.NewId):
             param_ids = self.env['report.excel.param'].search([('report_excel_id', '=', self.id)])
             for i in param_ids:
                 rel_model = 'false'
                 if i.param_ir_model_id.model:
                      rel_model = i.param_ir_model_id.model
-                params =''.join([params,'param(',i.code,'),',i.name,',',i.type_param,',',rel_model,';']) 
-            self.report_excel_param_content = params
+                params =''.join([params,'param(',i.code,'),',i.name,',',i.type_param,',',rel_model,';'])
+        self.report_excel_param_content = params
     def create_action(self):
         for report in self:
             context_report1 = "{'model': 'report.excel', 'id': %d}" % (report.id,)
             context_report2 = "{'id': %d, 'model': 'report.excel'}" % (report.id,)
-            action_id = self.env['ir.actions.act_window'].search(["&",('res_model', '=', 'report_excel_wizard'),"|",('context', '=', context_report1),('context', '=', context_report2)]).id
-            if action_id:
+            if (
+                action_id := self.env['ir.actions.act_window']
+                .search(
+                    [
+                        "&",
+                        ('res_model', '=', 'report_excel_wizard'),
+                        "|",
+                        ('context', '=', context_report1),
+                        ('context', '=', context_report2),
+                    ]
+                )
+                .id
+            ):
                 action = self.env['ir.actions.act_window'].search([('id', '=', action_id)])
                 action.name = report.name
                 vals = {
@@ -128,21 +141,21 @@ See bellow Legends for supported Date and Time Formats.
                 }
                 action.write(vals)
             else:
-                 view_id = self.env['ir.ui.view'].search([('model', '=', 'report_excel_wizard')]).id
-                 vals = {
-                     'name': report.name,
-                     'res_model': 'report_excel_wizard',
-                    'binding_model_id': report.root_model_id.id,
-                     'view_mode': 'form',
-                     'target': 'new',
-                     'view_id': view_id,
-                     'context': {
-                         'model': 'report.excel',
-                         'id': report.id,
-                     },
-                    'binding_type': 'report',
-                 }
-                 action = self.env['ir.actions.act_window'].create(vals)
+                view_id = self.env['ir.ui.view'].search([('model', '=', 'report_excel_wizard')]).id
+                vals = {
+                    'name': report.name,
+                    'res_model': 'report_excel_wizard',
+                   'binding_model_id': report.root_model_id.id,
+                    'view_mode': 'form',
+                    'target': 'new',
+                    'view_id': view_id,
+                    'context': {
+                        'model': 'report.excel',
+                        'id': report.id,
+                    },
+                   'binding_type': 'report',
+                }
+                action = self.env['ir.actions.act_window'].create(vals)
             report.write({'ir_values_id': action.id})
         return {'type': 'ir.actions.act_window_close'}
     def unlink_action(self):
@@ -260,14 +273,15 @@ See bellow Legends for supported Date and Time Formats.
                         )
             res = super(ReportExcel, self).write(vals_update_before)
         res = super(ReportExcel, self).write(vals)
-        if 'report_excel_param_ids' in vals and vals['report_excel_param_ids'][0][0] == 6:
-            pass
-        else:
-            check_test, check_text = self.check_report()  
+        if (
+            'report_excel_param_ids' not in vals
+            or vals['report_excel_param_ids'][0][0] != 6
+        ):
+            check_test, check_text = self.check_report()
             if check_test:
-                raise UserError(_(check_text))   
+                raise UserError(_(check_text))
         if 'report_excel_param_ids' in vals:
-            vals_update = {'report_excel_param_ids':[]} 
+            vals_update = {'report_excel_param_ids':[]}
             for param_id in self.report_excel_param_ids:
                 if param_id.wizard_param_ir_model_field_id.id == False:
                     seq_number = self.env['ir.sequence'].next_by_code('report.excel')
@@ -296,19 +310,31 @@ See bellow Legends for supported Date and Time Formats.
             records = self.env['ir.model.fields'].search([('id','in', unlink_ir_model_fields_ids)],[])
             for rec in records:
                 if rec.ttype == 'many2many':
-                    self.env.cr.execute("DELETE FROM %s WHERE id=%s" % ('ir_model_fields', rec.id))                    
+                    self.env.cr.execute(f"DELETE FROM ir_model_fields WHERE id={rec.id}")
                 else:
                     rec.unlink()
         return res
     def unlink(self):
-        wizard_param_ir_model_field_ids = [] 
-        for param in self.report_excel_param_ids:
-            wizard_param_ir_model_field_ids.append(param.wizard_param_ir_model_field_id.id)
+        wizard_param_ir_model_field_ids = [
+            param.wizard_param_ir_model_field_id.id
+            for param in self.report_excel_param_ids
+        ]
         for rec in self:
             context_report1 = "{'model': 'report.excel', 'id': %d}" % (rec.id,)
             context_report2 = "{'id': %d, 'model': 'report.excel'}" % (rec.id,)
-            action_id = self.env['ir.actions.act_window'].search(["&",('res_model', '=', 'report_excel_wizard'),"|",('context', '=', context_report1),('context', '=', context_report2)]).id
-            if action_id:
+            if (
+                action_id := self.env['ir.actions.act_window']
+                .search(
+                    [
+                        "&",
+                        ('res_model', '=', 'report_excel_wizard'),
+                        "|",
+                        ('context', '=', context_report1),
+                        ('context', '=', context_report2),
+                    ]
+                )
+                .id
+            ):
                 self.env['ir.ui.menu'].search([('action', '=', 'ir.actions.act_window,%d' % (action_id,))]).unlink()
                 self.env['ir.actions.act_window'].search(["&",('res_model', '=', 'report_excel_wizard'),"|",('context', '=', context_report1),('context', '=', context_report2)]).unlink()
         res = super(ReportExcel, self).unlink()
@@ -361,13 +387,13 @@ See bellow Legends for supported Date and Time Formats.
         section_intersection = {}
         for section in res:
             msg_section_header = '''Section: \"%s\"
-            '''  % (section.name,) 
+            '''  % (section.name,)
             section_result = False
             msg_section = ''
             section_start_col, section_start_row = CheckCell.coordinate_from_string(section.section_start)
             section_end_col, section_end_row = CheckCell.coordinate_from_string(section.section_end)
-            section_start_col_ind = CheckCell.column_index_from_string(section_start_col) 
-            section_end_col_ind = CheckCell.column_index_from_string(section_end_col) 
+            section_start_col_ind = CheckCell.column_index_from_string(section_start_col)
+            section_end_col_ind = CheckCell.column_index_from_string(section_end_col)
             section_arr = ()
             for c in range(section_start_col_ind, section_end_col_ind + 1):
                 for r in range(section_start_row, section_end_row + 1):
@@ -377,37 +403,35 @@ See bellow Legends for supported Date and Time Formats.
                     if section.id != s.id:
                         s_start_col, s_start_row = CheckCell.coordinate_from_string(s.section_start)
                         s_end_col, s_end_row = CheckCell.coordinate_from_string(s.section_end)
-                        s_start_col_ind = CheckCell.column_index_from_string(s_start_col) 
-                        s_start_end_ind = CheckCell.column_index_from_string(s_end_col) 
+                        s_start_col_ind = CheckCell.column_index_from_string(s_start_col)
+                        s_start_end_ind = CheckCell.column_index_from_string(s_end_col)
                         s_arr = ()
                         for c in range(s_start_col_ind, s_start_end_ind + 1):
                             for r in range(s_start_row, s_end_row + 1):
                                 s_arr += (CheckCell.cell_from_index(c,r),)
                         result_intersection = list(set(section_arr) & set(s_arr))
-                        if s.id in section_intersection and section.id in section_intersection[s.id]:
-                            pass
-                        else:
-                            if len(result_intersection):
-                                result_intersection.sort()
-                                result_intersection_str = ''
-                                for i in result_intersection:
-                                    result_intersection_str = result_intersection_str + i + ", " 
-                                msg = '''Incorrect Boundaries of Sections ! 
+                        if (
+                            s.id not in section_intersection
+                            or section.id not in section_intersection[s.id]
+                        ) and len(result_intersection):
+                            result_intersection.sort()
+                            result_intersection_str = ''
+                            for i in result_intersection:
+                                result_intersection_str = result_intersection_str + i + ", "
+                            msg = '''Incorrect Boundaries of Sections ! 
                                          Section \"%s\":  Start Section: \"%s\",  End Section: \"%s\"  - 
                                          Section \"%s\":  Start Section: \"%s\",  End Section: \"%s\".
                                          Intersection Of Cells: %s 
                                          Section Boundaries should not intersect with other sections of the same level ! \n
-                                '''  % (section.name, section.section_start, section.section_end, s.name, s.section_start, s.section_end, result_intersection_str,)                             
-                                msg_section = msg_section + msg 
-                                result = True
-                                section_result = True
-                                if section.id in section_intersection: 
-                                    section_intersection[section.id].append(s.id)
-                                else:
-                                    section_intersection[section.id] = [s.id]
-            section_field_cell = []
-            for field in section.report_excel_fields_ids:
-                section_field_cell.append(field.cell)
+                                '''  % (section.name, section.section_start, section.section_end, s.name, s.section_start, s.section_end, result_intersection_str,)
+                            msg_section = msg_section + msg
+                            result = True
+                            section_result = True
+                            if section.id in section_intersection: 
+                                section_intersection[section.id].append(s.id)
+                            else:
+                                section_intersection[section.id] = [s.id]
+            section_field_cell = [field.cell for field in section.report_excel_fields_ids]
             for cell in section_field_cell:
                 if cell not in section_arr:
                     msg = '''The Report Excel Field \"%s\" cannot be located outside the sections \"%s\"! 
@@ -462,7 +486,7 @@ See bellow Legends for supported Date and Time Formats.
                     msg_section = msg_section + msg_tmp 
                     result = True
                     section_result = True
-            if section.domain != '[]' and section.domain != False:
+            if section.domain not in ['[]', False]:
                 domain_split = re.split(r',', section.domain)
                 for sp in domain_split:
                     if 'param(' in sp:
@@ -512,16 +536,16 @@ class ReportExcelParam(models.Model):
     def _check_code(self):
         _code_re = re.compile(r'^[\w\d_-]*$')
         for rec in self:
-            code_string = rec.code 
+            code_string = rec.code
             match = _code_re.match(code_string)
             if not match:
-                msg = 'Invalid Parameter Code: "%s" ! In the "Code" are allowed only: Latin Letters, Numbers, Underscore, Dash.' % code_string
+                msg = f'Invalid Parameter Code: "{code_string}" ! In the "Code" are allowed only: Latin Letters, Numbers, Underscore, Dash.'
                 raise ValidationError(msg)
     @api.constrains('param_ir_model_id')
     def _check_param_ir_model_id(self):
         for rec in self:
-            if not rec.param_ir_model_id.id and rec.type_param in ['many2one', 'many2many'] :
-                msg = 'Parameter "%s" - Not filled "Param Model" field!' % rec.name
+            if not rec.param_ir_model_id.id and rec.type_param in ['many2one', 'many2many']:
+                msg = f'Parameter "{rec.name}" - Not filled "Param Model" field!'
                 raise ValidationError(msg)
             return 
 class ReportExcelSection(models.Model):
@@ -533,49 +557,41 @@ class ReportExcelSection(models.Model):
         if not self._context.get('section'):
             return self._context.get('root_model_id')
     def _get_root_model_related_field_domain(self):
-        if self._context.get('section'):
-            res = self.env['ir.model.fields'].search([('model_id','=', self._context.get('root_model_id')),('ttype','in', ('many2one','one2many','many2many'))],[])
-            if len(res.ids):
-                return [('id', 'in', res.ids)]
-            else:
-                return [('id', 'in', [0])]             
-        else:
+        if not self._context.get('section'):
             return []
+        res = self.env['ir.model.fields'].search([('model_id','=', self._context.get('root_model_id')),('ttype','in', ('many2one','one2many','many2many'))],[])
+        return [('id', 'in', res.ids)] if len(res.ids) else [('id', 'in', [0])]
     def _get_root_model_domain(self):
-        if self._context.get('section'):
-            res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
-            model_ids = []
-            if res:
-                relation = []
-                model =  res.model
-                fields = self.env[model].fields_get()
-                for k,v in list(fields.items()):
-                    if v.get('relation'):
-                        relation.append(v.get('relation'))
-                model_ids = self.env['ir.model'].search([('model','in', list(set(relation)))],[]).ids
-            if len(model_ids):
-                return [('id', 'in', model_ids)]
-            else:
-                return [('id', 'in', [0])] 
-        else:
+        if not self._context.get('section'):
             return [('id', '=', self._context.get('root_model_id'))]
-    @api.model    
+        res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
+        model_ids = []
+        if res:
+            model =  res.model
+            fields = self.env[model].fields_get()
+            relation = [
+                v.get('relation')
+                for k, v in list(fields.items())
+                if v.get('relation')
+            ]
+            model_ids = self.env['ir.model'].search([('model','in', list(set(relation)))],[]).ids
+        return [('id', 'in', model_ids)] if len(model_ids) else [('id', 'in', [0])]
+    @api.model
     def _compute_root_model_name(self):
         if not self._context.get('section'):
             res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
             if len(res):
-                model_name = res.model
-                return model_name
-    @api.model    
+                return res.model
+    @api.model
     def _check_root_model(self):
         res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
         if len(res):
             return True
+        if self._context.get('section'):
+            raise UserError(_('Parent Section Field is not defined. Before you can define a Child Section, you must specify a Parent Section Field for this Section.'))
+
         else:
-            if not self._context.get('section'):
-                raise UserError(_('Report Root Model is not defined. Before you can define a Section, you must specify a Report Root Model.'))
-            else:
-                raise UserError(_('Parent Section Field is not defined. Before you can define a Child Section, you must specify a Parent Section Field for this Section.'))
+            raise UserError(_('Report Root Model is not defined. Before you can define a Section, you must specify a Report Root Model.'))
     @api.model    
     def _check_section(self):
         if self._context.get('section'):
@@ -665,14 +681,13 @@ class ReportExcelSection(models.Model):
                     self.root_model_id = res.id            
             else:
                 self.root_model_id = False
-        else:
-            if self.section:
-                if self.root_model_related_field_id:            
-                    res = self.env['ir.model'].search([('model','=', self.root_model_related_field_id.relation)],[])
-                    if len(res):
-                        self.root_model_id = res.id            
-                else:
-                    self.root_model_id = False
+        elif self.section:        
+            if self.root_model_related_field_id:
+                res = self.env['ir.model'].search([('model','=', self.root_model_related_field_id.relation)],[])
+                if len(res):
+                    self.root_model_id = res.id
+            else:
+                self.root_model_id = False
     @api.onchange('root_model_id')
     @api.model
     def _set_root_model_name(self):
@@ -685,18 +700,17 @@ class ReportExcelSection(models.Model):
                 self.root_model_name = False 
             self.children_ids = [(2, line_id, False) for line_id in self.children_ids.ids]
             self.report_excel_fields_ids = [(2, line_id, False) for line_id in self.report_excel_fields_ids.ids]
+            self.domain = '[]'
+        elif self.section:
+            if self.root_model_id:
+                res = self.env['ir.model'].search([('id','=', self.root_model_id.id)],[])
+                if len(res):
+                    self.root_model_name = res.model
+            else:
+                self.root_model_name = False 
+            self.children_ids = [(2, line_id, False) for line_id in self.children_ids.ids]
+            self.report_excel_fields_ids = [(2, line_id, False) for line_id in self.report_excel_fields_ids.ids]
             self.domain = '[]'    
-        else:
-            if self.section:
-                if self.root_model_id:
-                    res = self.env['ir.model'].search([('id','=', self.root_model_id.id)],[])
-                    if len(res):
-                        self.root_model_name = res.model
-                else:
-                    self.root_model_name = False 
-                self.children_ids = [(2, line_id, False) for line_id in self.children_ids.ids]
-                self.report_excel_fields_ids = [(2, line_id, False) for line_id in self.report_excel_fields_ids.ids]
-                self.domain = '[]'    
     @api.model
     def _list_all_models(self):
         self._cr.execute("SELECT model, name FROM ir_model ORDER BY name")
@@ -742,20 +756,18 @@ class ReportExcelFields(models.Model):
     @api.model    
     def _compute_root_model(self):
         return self._context.get('root_model_id')
-    @api.model    
+    @api.model
     def _compute_root_model_name(self):
         res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
         if len(res):
-            model_name = res.model
-            return model_name
-    @api.model    
+            return res.model
+    @api.model
     def _check_root_model(self):
         res = self.env['ir.model'].search([('id','=', self._context.get('root_model_id'))],[])
         if len(res):
             return True
-        else:
-            if not self._context.get('section'):
-                raise UserError(_('Parent Section Field is not defined. Before you can define a Report Section Fields, you must specify a Parent Section Field.'))
+        if not self._context.get('section'):
+            raise UserError(_('Parent Section Field is not defined. Before you can define a Report Section Fields, you must specify a Parent Section Field.'))
     @api.depends('field_type')
     def _compute_aggregate_ids(self):
         for field in self:
@@ -768,20 +780,18 @@ class ReportExcelFields(models.Model):
                 domain = [('code', 'in', ('count',))]
             field.aggregate_ids = self.env['report.excel.aggregate'].search(domain,[]).mapped('id')
             domain = []
-            if field._context.get('report_id'):
-                report_id = field._context.get('report_id')
-            else:
-                if field.report_excel_section_id.report_id:
-                    report_id = field.report_excel_section_id.report_id
-                else:
-                    report_id = 0
+            report_id = (
+                field._context.get('report_id')
+                or field.report_excel_section_id.report_id
+                or 0
+            )
             if field.field_type in ('date',) and field.aggregate_id.code != 'count':
                 domain = [('report_excel_id','=', report_id),('type_param','in', ('date',))]
-            elif field.field_type in ('date',) and field.aggregate_id.code == 'count':
+            elif field.field_type in ('date',):
                 domain = [('report_excel_id','=', report_id),('type_param','in', ('integer','float',))]
             elif field.field_type in ('datetime',) and field.aggregate_id.code != 'count':
                 domain = [('report_excel_id','=', report_id),('type_param','in', ('datetime',))]
-            elif field.field_type in ('datetime',) and field.aggregate_id.code == 'count':
+            elif field.field_type in ('datetime',):
                 domain = [('report_excel_id','=', report_id),('type_param','in', ('integer','float',))]
             else:
                 domain = [('report_excel_id','=', report_id),('type_param','in', ('integer','float',))]
@@ -866,8 +876,7 @@ class ReportExcelFields(models.Model):
     def _check_python_code(self):
         for f in self.sudo().filtered('formulas'):
             if f.formula:
-                msg = test_python_expr(expr=f.formulas.strip(), mode="exec")
-                if msg:
+                if msg := test_python_expr(expr=f.formulas.strip(), mode="exec"):
                     msg = 'Please check the formula in Cell "%s" !\n \n' % (f.cell,) + msg
                     raise ValidationError(msg)
     @api.model
@@ -878,28 +887,29 @@ class ReportExcelFields(models.Model):
     def _compute_cumulative_model_field(self):
         for rec in self:
             name = ''
-            name = rec.model_field_selector if rec.model_field_selector else ''
+            name = rec.model_field_selector or ''
             name_split = name.split('.')
             new_name = ''
-            model =  rec.root_model_name    
+            model =  rec.root_model_name
             field_err = False
             try:
                 for i in name_split:
                     field = self.env[model].fields_get([i])
-                    display_name = field[i].get('string') 
-                    field_dict = field[i] 
-                    if 'relation' in field_dict:
-                        rel = field[i].get('relation')
-                    else:
-                        rel = ''
-                    new_name =  (new_name + ' --> ' + display_name + '(' + model + ')')  if (new_name != '') else (display_name + '(' + model + ')')
+                    display_name = field[i].get('string')
+                    field_dict = field[i]
+                    rel = field[i].get('relation') if 'relation' in field_dict else ''
+                    new_name = (
+                        f'{new_name} --> {display_name}({model})'
+                        if new_name != ''
+                        else f'{display_name}({model})'
+                    )
                     model = rel
                     field_type = field[i].get('type')
             except KeyError:
                 new_name = ' '
                 field_err = True
             if not field_err:
-                rec.field_type = field_type 
+                rec.field_type = field_type
             rec.cumulative_model_field = new_name
     @api.onchange('cumulative_model_field')
     def _onchange_aggregate_domain(self):
@@ -914,20 +924,18 @@ class ReportExcelFields(models.Model):
     @api.onchange('cumulative_model_field', 'aggregate_id', 'having_selection')
     def _onchange_having_param_domain(self):
         self.having_param_id = None
-        if self._context.get('report_id'):
-            report_id = self._context.get('report_id')
-        else:
-            if self.report_excel_section_id.report_id:
-                report_id = self.report_excel_section_id.report_id
-            else:
-                report_id = 0
+        report_id = (
+            self._context.get('report_id')
+            or self.report_excel_section_id.report_id
+            or 0
+        )
         if self.field_type in ('date',) and self.aggregate_id.code != 'count':
             return {'domain': {'having_param_id': [('report_excel_id','=', report_id),('type_param','in', ('date',))]}}
-        if self.field_type in ('date',) and self.aggregate_id.code == 'count':
+        if self.field_type in ('date',):
             return {'domain': {'having_param_id': [('report_excel_id','=', report_id),('type_param','in', ('integer','float',))]}}
         elif self.field_type in ('datetime',) and self.aggregate_id.code != 'count':
             return {'domain': {'having_param_id': [('report_excel_id','=', report_id),('type_param','in', ('datetime',))]}}
-        elif self.field_type in ('datetime',) and self.aggregate_id.code == 'count':
+        elif self.field_type in ('datetime',):
             return {'domain': {'having_param_id': [('report_excel_id','=', report_id),('type_param','in', ('integer','float',))]}}
         else:
             return {'domain': {'having_param_id': [('report_excel_id','=', report_id),('type_param','in', ('integer','float'))]}}
@@ -952,18 +960,18 @@ class ReportExcelFields(models.Model):
         self.having_value_float = 0.0
         self.having_value_date = None
         self.having_value_datetime = None
-        if self.having_selection == None:
+        if self.having_selection is None:
             self.having_selection = 'value'
     @api.onchange('cumulative_model_field', 'aggregate_id')
     def _onchange_having_value_type(self):
         self.having_value_type = False
         if self.field_type in ('date',) and self.aggregate_id.code != 'count':
             self.having_value_type = 'date'
-        elif self.field_type in ('date',) and self.aggregate_id.code == 'count':
+        elif self.field_type in ('date',):
             self.having_value_type = 'float'
         elif self.field_type in ('datetime',) and self.aggregate_id.code != 'count':
             self.having_value_type = 'datetime'
-        elif self.field_type in ('datetime',) and self.aggregate_id.code == 'count':
+        elif self.field_type in ('datetime',):
             self.having_value_type = 'float'
         else:
             self.having_value_type = 'float'
@@ -972,17 +980,17 @@ class ReportExcelFields(models.Model):
         for rec in self:
             new_name = ''
             if rec.having_operator:
-                new_name += MAP_HAVING_OPERATOR[rec.having_operator] + ':'
+                new_name += f'{MAP_HAVING_OPERATOR[rec.having_operator]}:'
                 if rec.having_selection == 'param':
                     if rec.having_param_id.id:
-                        new_name =  new_name + '  Param(' + rec.having_param_id.code + ')'
-                if rec.having_selection == 'value':
-                    if rec.having_value_type == 'float':
-                        new_name =  new_name + '  ' + str(rec.having_value_float)
+                        new_name = f'{new_name}  Param({rec.having_param_id.code})'
+                elif rec.having_selection == 'value':
                     if rec.having_value_type == 'date':
-                        new_name =  new_name + '  ' + str(rec.having_value_date)
-                    if rec.having_value_type == 'datetime':
-                        new_name =  new_name + '  ' + str(rec.having_value_datetime)
+                        new_name = f'{new_name}  {str(rec.having_value_date)}'
+                    elif rec.having_value_type == 'datetime':
+                        new_name = f'{new_name}  {str(rec.having_value_datetime)}'
+                    elif rec.having_value_type == 'float':
+                        new_name = f'{new_name}  {str(rec.having_value_float)}'
             rec.cumulative_having_field = new_name
     @api.model
     @api.onchange('aggregate_id','group_by')
@@ -999,15 +1007,15 @@ class ReportExcelFields(models.Model):
     def _check_format(self):
         _coord_re = re.compile('^[$]?([A-Z]+)[$]?(\d+)$')
         for rec in self:
-            coord_string = rec.cell 
+            coord_string = rec.cell
             match = _coord_re.match(coord_string)
             if not match:
-                msg = 'Invalid cell coordinates (%s)' % coord_string
+                msg = f'Invalid cell coordinates ({coord_string})'
                 raise ValidationError(msg)
             column, row = match.groups()
             row = int(row)
             if not row:
-                msg = "There is no row 0 (%s)" % coord_string
+                msg = f"There is no row 0 ({coord_string})"
                 raise ValidationError(msg)
             return 
     @api.model
@@ -1087,12 +1095,12 @@ class CellUtils(object):
     def coordinate_from_string(self, coord_string):
         match = self._coord_re.match(coord_string.upper())
         if not match:
-            msg = 'Invalid cell coordinates (%s)' % coord_string
+            msg = f'Invalid cell coordinates ({coord_string})'
             raise ValueError(msg)
         column, row = match.groups()
         row = int(row)
         if not row:
-            msg = "There is no row 0 (%s)" % coord_string
+            msg = f"There is no row 0 ({coord_string})"
             raise ValueError(msg)
         return (column, row)
     def _get_column_letter(self, col_idx):

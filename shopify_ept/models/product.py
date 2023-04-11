@@ -23,8 +23,7 @@ class ProductTemplate(models.Model):
                     shopify_templates = shopify_product_template_obj.search(
                         [('product_tmpl_id', '=', template.id), ('active', '=', False)])
                 shopify_templates and shopify_templates.write({'active': vals.get('active')})
-        res = super(ProductTemplate, self).write(vals)
-        return res
+        return super(ProductTemplate, self).write(vals)
 
 
 class ProductProduct(models.Model):
@@ -46,5 +45,4 @@ class ProductProduct(models.Model):
                     shopify_product = shopify_product_product_obj.search(
                         [('product_id', '=', product.id), ('active', '=', False)])
                 shopify_product and shopify_product.write({'active': vals.get('active')})
-        res = super(ProductProduct, self).write(vals)
-        return res
+        return super(ProductProduct, self).write(vals)

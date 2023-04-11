@@ -83,8 +83,7 @@ class ShopifyProductTemplateEpt(models.Model):
                                                                              shopify_template.shopify_instance_id.id),
                          ("active", "=", False)])
                     shopify_variants and shopify_variants.write({"active": vals.get("active")})
-        res = super(ShopifyProductTemplateEpt, self).write(vals)
-        return res
+        return super(ShopifyProductTemplateEpt, self).write(vals)
 
     @api.model
     def find_template_attribute_values(self, template_options, product_template_id, variant):
@@ -103,26 +102,29 @@ class ShopifyProductTemplateEpt(models.Model):
 
         product_attribute_list = []
         template_attribute_value_domain = []
-        counter = 0
-
         for attribute in template_options:
             product_attribute = product_attribute_obj.get_attribute(attribute.get("name"), auto_create=True)
             product_attribute_list.append(product_attribute.id)
 
-        for product_attribute in product_attribute_list:
-            counter += 1
-            attribute_name = "option" + str(counter)
+        for counter, product_attribute in enumerate(product_attribute_list, start=1):
+            attribute_name = f"option{counter}"
             attribute_val = variant.get(attribute_name)
-            product_attribute_value = product_attribute_value_obj.get_attribute_values(attribute_val, product_attribute,
-                                                                                       auto_create=True)
-
-            if product_attribute_value:
+            if product_attribute_value := product_attribute_value_obj.get_attribute_values(
+                attribute_val, product_attribute, auto_create=True
+            ):
                 product_attribute_value = product_attribute_value[0]
-                template_attribute_value_id = product_template_attribute_value_obj.search(
-                    [("product_attribute_value_id", "=", product_attribute_value.id),
-                     ("attribute_id", "=", product_attribute),
-                     ("product_tmpl_id", "=", product_template_id)], limit=1)
-                if template_attribute_value_id:
+                if template_attribute_value_id := product_template_attribute_value_obj.search(
+                    [
+                        (
+                            "product_attribute_value_id",
+                            "=",
+                            product_attribute_value.id,
+                        ),
+                        ("attribute_id", "=", product_attribute),
+                        ("product_tmpl_id", "=", product_template_id),
+                    ],
+                    limit=1,
+                ):
                     domain = ("product_template_attribute_value_ids", "=", template_attribute_value_id.id)
                     template_attribute_value_domain.append(domain)
 
@@ -149,7 +151,7 @@ class ShopifyProductTemplateEpt(models.Model):
                     "description_sale": description}
 
             if barcode:
-                vals.update({"barcode": barcode})
+                vals["barcode"] = barcode
 
             odoo_product = odoo_product.create(vals)
             if attribute_line_data:
@@ -175,9 +177,14 @@ class ShopifyProductTemplateEpt(models.Model):
                     time.sleep(5)
                     result = [shopify.Product().find(template_id)]
                     return result
-                message = "Error while importing product for order. Product ID: %s.\nError: %s\n%s" % (
-                    template_id, str(error.response.code) + " " + error.response.msg,
-                    json.loads(error.response.body.decode()).get("errors")[0])
+                message = (
+                    "Error while importing product for order. Product ID: %s.\nError: %s\n%s"
+                    % (
+                        template_id,
+                        f"{str(error.response.code)} {error.response.msg}",
+                        json.loads(error.response.body.decode()).get("errors")[0],
+                    )
+                )
                 self.create_log_line_for_queue_line(message, model_id, log_book_id, False, order_queue_line, "")
         except Exception as error:
             if order_queue_line:
@@ -194,21 +201,26 @@ class ShopifyProductTemplateEpt(models.Model):
         @param variant_data: Data of Shopify variant.
         @author: Maulik Barad on Date 01-Sep-2020.
         """
-        variant_vals = {"shopify_instance_id": instance.id,
-                        "variant_id": variant_data.get("id"),
-                        "sequence": variant_data.get("position"),
-                        "default_code": variant_data.get("sku", ""),
-                        "inventory_item_id": variant_data.get("inventory_item_id"),
-                        "inventory_management": "shopify" if variant_data.get(
-                            "inventory_management") == "shopify" else "Dont track Inventory",
-                        "check_product_stock": variant_data.get("inventory_policy"),
-                        "taxable": variant_data.get("taxable"),
-                        "created_at": self.convert_shopify_date_into_odoo_format(variant_data.get("created_at")),
-                        "updated_at": self.convert_shopify_date_into_odoo_format(variant_data.get("updated_at")),
-                        "exported_in_shopify": True,
-                        "active": True}
-
-        return variant_vals
+        return {
+            "shopify_instance_id": instance.id,
+            "variant_id": variant_data.get("id"),
+            "sequence": variant_data.get("position"),
+            "default_code": variant_data.get("sku", ""),
+            "inventory_item_id": variant_data.get("inventory_item_id"),
+            "inventory_management": "shopify"
+            if variant_data.get("inventory_management") == "shopify"
+            else "Dont track Inventory",
+            "check_product_stock": variant_data.get("inventory_policy"),
+            "taxable": variant_data.get("taxable"),
+            "created_at": self.convert_shopify_date_into_odoo_format(
+                variant_data.get("created_at")
+            ),
+            "updated_at": self.convert_shopify_date_into_odoo_format(
+                variant_data.get("updated_at")
+            ),
+            "exported_in_shopify": True,
+            "active": True,
+        }
 
     def create_log_line_for_queue_line(self, message, model_id, log_book_id, product_data_line_id, order_data_line_id,
                                        product_sku, create_activity=False):
@@ -233,11 +245,7 @@ class ShopifyProductTemplateEpt(models.Model):
             from_sale = True
 
         if create_activity and (order_data_line_id or product_data_line_id):
-            if from_sale:
-                queue_line = order_data_line_id
-            else:
-                queue_line = product_data_line_id
-
+            queue_line = order_data_line_id if from_sale else product_data_line_id
             shopify_product_queue_obj.create_schedule_activity_for_product(queue_line, from_sale)
 
         return True
@@ -249,15 +257,12 @@ class ShopifyProductTemplateEpt(models.Model):
         """
         product_category_obj = self.env["product.category"]
 
-        product_category = product_category_obj.search([("name", "=", product_type),
-                                                        ("is_shopify_product_cat", "=", True)],
-                                                       limit=1)
-
-        if not product_category:
-            product_category = product_category_obj.create({"name": product_type,
-                                                            "is_shopify_product_cat": True})
-
-        return product_category
+        return product_category_obj.search(
+            [("name", "=", product_type), ("is_shopify_product_cat", "=", True)],
+            limit=1,
+        ) or product_category_obj.create(
+            {"name": product_type, "is_shopify_product_cat": True}
+        )
 
     def shopify_sync_products(self, product_data_line_id, shopify_tmpl_id, instance, log_book_id,
                               order_data_line_id=False):
@@ -293,8 +298,9 @@ class ShopifyProductTemplateEpt(models.Model):
         if not template_data:
             return True
 
-        _logger.info("Process started for Product- %s || %s." % (template_data.get("id"),
-                                                                 template_data.get("title")))
+        _logger.info(
+            f'Process started for Product- {template_data.get("id")} || {template_data.get("title")}.'
+        )
 
         product_category = self.get_product_category(template_data.get("product_type"))
 
@@ -317,8 +323,9 @@ class ShopifyProductTemplateEpt(models.Model):
         if shopify_template and product_data_line_id:
             product_data_line_id.write({"state": "done", "last_process_date": datetime.now()})
 
-        _logger.info("Process completed of Product- %s || %s." % (template_data.get("id"),
-                                                                  template_data.get("title")))
+        _logger.info(
+            f'Process completed of Product- {template_data.get("id")} || {template_data.get("title")}.'
+        )
 
         return shopify_template
 
@@ -351,7 +358,7 @@ class ShopifyProductTemplateEpt(models.Model):
             barcode = variant.get("barcode")
 
             if not sku and not barcode:
-                message = "Product %s have no sku and barcode having variant id %s." % (name, variant_id)
+                message = f"Product {name} have no sku and barcode having variant id {variant_id}."
                 self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                     order_data_line_id, sku)
                 continue
@@ -376,13 +383,14 @@ class ShopifyProductTemplateEpt(models.Model):
                                                              limit=1)
 
                 if not shopify_product:
-                    attribute_value_domain = self.find_template_attribute_values(shopify_attributes, odoo_template.id,
-                                                                                 variant)
-                    if attribute_value_domain:
+                    if attribute_value_domain := self.find_template_attribute_values(
+                        shopify_attributes, odoo_template.id, variant
+                    ):
                         odoo_product = odoo_product.search(attribute_value_domain)
 
-                message = self.is_product_importable(template_data, instance, odoo_product, shopify_product)
-                if message:
+                if message := self.is_product_importable(
+                    template_data, instance, odoo_product, shopify_product
+                ):
                     self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                         order_data_line_id, sku, create_activity=True)
                     break
@@ -412,7 +420,7 @@ class ShopifyProductTemplateEpt(models.Model):
                                                             order_data_line_id, sku, create_activity=True)
                         continue
                 else:
-                    message = "Product %s Not found for sku %s in Odoo." % (name, sku)
+                    message = f"Product {name} Not found for sku {sku} in Odoo."
                     self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                         order_data_line_id, sku)
                     continue
@@ -449,15 +457,16 @@ class ShopifyProductTemplateEpt(models.Model):
             variant_vals = self.prepare_variant_vals(instance, variant)
 
             if not sku and not barcode:
-                message = "Product %s have no sku and barcode having variant id %s." % (name, variant_id)
+                message = f"Product {name} have no sku and barcode having variant id {variant_id}."
                 self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                     order_data_line_id, sku)
                 continue
 
             shopify_product, odoo_product = self.shopify_search_odoo_product_variant(instance, variant_id, sku, barcode)
 
-            message = self.is_product_importable(template_data, instance, odoo_product, shopify_product)
-            if message:
+            if message := self.is_product_importable(
+                template_data, instance, odoo_product, shopify_product
+            ):
                 self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                     order_data_line_id, sku, create_activity=True)
                 break
@@ -489,7 +498,7 @@ class ShopifyProductTemplateEpt(models.Model):
                     update_template=True, update_variant=True)
                 need_to_update_template = False
             else:
-                message = "Product %s not found for sku %s in Odoo." % (name, sku)
+                message = f"Product {name} not found for sku {sku} in Odoo."
                 self.create_log_line_for_queue_line(message, model_id, log_book_id, product_data_line_id,
                                                     order_data_line_id, sku)
                 continue
@@ -529,26 +538,22 @@ class ShopifyProductTemplateEpt(models.Model):
         product_attribute_value_obj = self.env["product.attribute.value"]
         odoo_product_obj = self.env["product.product"]
 
-        counter = 0
         sku = variant_data.get("sku")
         odoo_attribute_lines = odoo_template.attribute_line_ids.filtered(
             lambda x: x.attribute_id.create_variant == "always")
 
         if len(odoo_attribute_lines) != len(shopify_attributes):
-            message = "Product %s has tried to add new attribute for sku %s in Odoo." % (shopify_template.name, sku)
-            return message
-
+            return f"Product {shopify_template.name} has tried to add new attribute for sku {sku} in Odoo."
         attribute_value_domain = self.find_template_attribute_values(shopify_attributes, odoo_template.id, variant_data)
         if not attribute_value_domain:
-            for shopify_attribute in shopify_attributes:
-                counter += 1
-                attribute_name = "option" + str(counter)
+            for counter, shopify_attribute in enumerate(shopify_attributes, start=1):
+                attribute_name = f"option{counter}"
                 attribute_value = variant_data.get(attribute_name)
 
                 attribute_id = odoo_attribute_lines.filtered(
                     lambda x: x.display_name == shopify_attribute.get("name")).attribute_id.id
                 value_id = \
-                    product_attribute_value_obj.get_attribute_values(attribute_value, attribute_id, auto_create=True)[
+                        product_attribute_value_obj.get_attribute_values(attribute_value, attribute_id, auto_create=True)[
                         0].id
 
                 attribute_line = odoo_attribute_lines.filtered(lambda x: x.attribute_id.id == attribute_id)
@@ -559,13 +564,13 @@ class ShopifyProductTemplateEpt(models.Model):
         attribute_value_domain = self.find_template_attribute_values(shopify_attributes, odoo_template.id, variant_data)
         odoo_product = odoo_product_obj.search(attribute_value_domain)
 
-        if not odoo_product:
-            message = "Unknown error occurred. Couldn't find product %s with sku %s in Odoo." % (
-                shopify_template.title, sku)
-            return message
-
-        shopify_product = self.create_or_update_shopify_variant(variant_vals, False, shopify_template, odoo_product)
-        return shopify_product
+        return (
+            self.create_or_update_shopify_variant(
+                variant_vals, False, shopify_template, odoo_product
+            )
+            if odoo_product
+            else f"Unknown error occurred. Couldn't find product {shopify_template.title} with sku {sku} in Odoo."
+        )
 
     def prepare_attribute_line_data_for_variant(self, shopify_attributes, variant_data):
         """
@@ -578,17 +583,14 @@ class ShopifyProductTemplateEpt(models.Model):
         product_attribute_value_obj = self.env['product.attribute.value']
 
         attribute_line_data = []
-        counter = 0
-
-        for shopify_attribute in shopify_attributes:
-            counter += 1
-            attribute_name = "option" + str(counter)
+        for counter, shopify_attribute in enumerate(shopify_attributes, start=1):
+            attribute_name = f"option{str(counter)}"
             shopify_attribute_value = variant_data.get(attribute_name)
 
             attribute = product_attribute_obj.get_attribute(shopify_attribute.get("name"), auto_create=True)
-            attribute_value = product_attribute_value_obj.get_attribute_values(shopify_attribute_value, attribute.id,
-                                                                               auto_create=True)
-            if attribute_value:
+            if attribute_value := product_attribute_value_obj.get_attribute_values(
+                shopify_attribute_value, attribute.id, auto_create=True
+            ):
                 attribute_value = attribute_value[0]
                 attribute_line_vals = (
                     0, False, {'attribute_id': attribute.id, 'value_ids': [[6, False, attribute_value.ids]]})
@@ -643,54 +645,13 @@ class ShopifyProductTemplateEpt(models.Model):
         for odoo_image in self.product_tmpl_id.ept_image_ids:
             if not odoo_image.image:
                 continue
-            key = hashlib.md5(odoo_image.image).hexdigest()
-            if not key:
-                continue
-            existing_common_template_images.update({key: odoo_image.id})
+            if key := hashlib.md5(odoo_image.image).hexdigest():
+                existing_common_template_images[key] = odoo_image.id
         for image in template_data.get("images", {}):
             if image.get("src"):
                 shopify_image_id = str(image.get("id"))
                 url = image.get("src")
-                variant_ids = image.get("variant_ids")
-
-                if not variant_ids:
-                    """For Template Images."""
-                    shopify_product_image = shopify_product_image_obj.search(
-                        [("shopify_template_id", "=", self.id),
-                         ("shopify_variant_id", "=", False),
-                         ("shopify_image_id", "=", shopify_image_id)])
-                    if not shopify_product_image:
-                        try:
-                            response = requests.get(url, stream=True, verify=False, timeout=10)
-                            if response.status_code == 200:
-                                image = base64.b64encode(response.content)
-                                key = hashlib.md5(image).hexdigest()
-                                if key in existing_common_template_images.keys():
-                                    shopify_product_image = shopify_product_image_obj.create(
-                                        {"shopify_template_id": self.id,
-                                         "shopify_image_id": shopify_image_id,
-                                         "odoo_image_id": existing_common_template_images[key]})
-                                else:
-                                    if not self.product_tmpl_id.image_1920:
-                                        self.product_tmpl_id.image_1920 = image
-                                        common_product_image = self.product_tmpl_id.ept_image_ids.filtered(
-                                            lambda x: x.image == self.product_tmpl_id.image_1920)
-                                    else:
-                                        common_product_image = common_product_image_obj.create(
-                                            {"name": self.name,
-                                             "template_id": self.product_tmpl_id.id,
-                                             "image": image,
-                                             "url": url})
-                                    shopify_product_image = shopify_product_image_obj.search([
-                                        ("shopify_template_id", "=", self.id),
-                                        ("odoo_image_id", "=", common_product_image.id)])
-                                    if shopify_product_image:
-                                        shopify_product_image.shopify_image_id = shopify_image_id
-                        except Exception:
-                            pass
-                    shopify_product_images += shopify_product_image
-
-                else:
+                if variant_ids := image.get("variant_ids"):
                     """For Variant Images."""
                     shopify_products = self.shopify_product_ids.filtered(lambda x: int(x.variant_id) in variant_ids)
                     for shopify_product in shopify_products:
@@ -698,10 +659,8 @@ class ShopifyProductTemplateEpt(models.Model):
                         for odoo_image in shopify_product.product_id.ept_image_ids:
                             if not odoo_image.image:
                                 continue
-                            key = hashlib.md5(odoo_image.image).hexdigest()
-                            if not key:
-                                continue
-                            existing_common_variant_images.update({key: odoo_image.id})
+                            if key := hashlib.md5(odoo_image.image).hexdigest():
+                                existing_common_variant_images[key] = odoo_image.id
 
                         shopify_product_image = shopify_product_image_obj.search(
                             [("shopify_variant_id", "=", shopify_product.id),
@@ -712,7 +671,7 @@ class ShopifyProductTemplateEpt(models.Model):
                                 if response.status_code == 200:
                                     image = base64.b64encode(response.content)
                                     key = hashlib.md5(image).hexdigest()
-                                    if key in existing_common_variant_images.keys():
+                                    if key in existing_common_variant_images:
                                         shopify_product_image = shopify_product_image_obj.create(
                                             {"shopify_template_id": self.id,
                                              "shopify_variant_id": shopify_product.id,
@@ -740,6 +699,43 @@ class ShopifyProductTemplateEpt(models.Model):
                             except Exception:
                                 pass
                         shopify_product_images += shopify_product_image
+
+                else:
+                    """For Template Images."""
+                    shopify_product_image = shopify_product_image_obj.search(
+                        [("shopify_template_id", "=", self.id),
+                         ("shopify_variant_id", "=", False),
+                         ("shopify_image_id", "=", shopify_image_id)])
+                    if not shopify_product_image:
+                        try:
+                            response = requests.get(url, stream=True, verify=False, timeout=10)
+                            if response.status_code == 200:
+                                image = base64.b64encode(response.content)
+                                key = hashlib.md5(image).hexdigest()
+                                if key in existing_common_template_images:
+                                    shopify_product_image = shopify_product_image_obj.create(
+                                        {"shopify_template_id": self.id,
+                                         "shopify_image_id": shopify_image_id,
+                                         "odoo_image_id": existing_common_template_images[key]})
+                                else:
+                                    if not self.product_tmpl_id.image_1920:
+                                        self.product_tmpl_id.image_1920 = image
+                                        common_product_image = self.product_tmpl_id.ept_image_ids.filtered(
+                                            lambda x: x.image == self.product_tmpl_id.image_1920)
+                                    else:
+                                        common_product_image = common_product_image_obj.create(
+                                            {"name": self.name,
+                                             "template_id": self.product_tmpl_id.id,
+                                             "image": image,
+                                             "url": url})
+                                    shopify_product_image = shopify_product_image_obj.search([
+                                        ("shopify_template_id", "=", self.id),
+                                        ("odoo_image_id", "=", common_product_image.id)])
+                                    if shopify_product_image:
+                                        shopify_product_image.shopify_image_id = shopify_image_id
+                        except Exception:
+                            pass
+                    shopify_product_images += shopify_product_image
 
         all_shopify_product_images = shopify_product_image_obj.search([("shopify_template_id",
                                                                         "=", self.id)])
@@ -776,23 +772,28 @@ class ShopifyProductTemplateEpt(models.Model):
         else:
             website_published = "unpublished"
 
-        template_dict = {"shopify_instance_id": instance.id,
-                         "template_title": template_data.get("title"),
-                         "body_html": template_data.get("body_html"),
-                         "product_type": template_data.get("product_type"),
-                         "tags": tag_ids,
-                         "shopify_tmpl_id": template_data.get("id"),
-                         "shopify_product_category": product_category.id if product_category else False,
-                         "created_at": self.convert_shopify_date_into_odoo_format(
-                             template_data.get("created_at")),
-                         "updated_at": self.convert_shopify_date_into_odoo_format(
-                             template_data.get("updated_at")),
-                         "published_at": self.convert_shopify_date_into_odoo_format(
-                             template_data.get("published_at")),
-                         "website_published": website_published,
-                         "active": True}
-
-        return template_dict
+        return {
+            "shopify_instance_id": instance.id,
+            "template_title": template_data.get("title"),
+            "body_html": template_data.get("body_html"),
+            "product_type": template_data.get("product_type"),
+            "tags": tag_ids,
+            "shopify_tmpl_id": template_data.get("id"),
+            "shopify_product_category": product_category.id
+            if product_category
+            else False,
+            "created_at": self.convert_shopify_date_into_odoo_format(
+                template_data.get("created_at")
+            ),
+            "updated_at": self.convert_shopify_date_into_odoo_format(
+                template_data.get("updated_at")
+            ),
+            "published_at": self.convert_shopify_date_into_odoo_format(
+                template_data.get("published_at")
+            ),
+            "website_published": website_published,
+            "active": True,
+        }
 
     def convert_shopify_date_into_odoo_format(self, product_date):
         """
@@ -800,11 +801,13 @@ class ShopifyProductTemplateEpt(models.Model):
         :return shopify product date
         @author: Nilesh Parmar @Emipro Technologies Pvt. Ltd on date 2/11/2019
         """
-        shopify_product_date = False
-        if not product_date:
-            return shopify_product_date
-        shopify_product_date = parser.parse(product_date).astimezone(utc).strftime("%Y-%m-%d %H:%M:%S")
-        return shopify_product_date
+        return (
+            parser.parse(product_date)
+            .astimezone(utc)
+            .strftime("%Y-%m-%d %H:%M:%S")
+            if product_date
+            else False
+        )
 
     def shopify_search_odoo_product_variant(self, shopify_instance, variant_id, product_sku, barcode):
         """
@@ -894,7 +897,7 @@ class ShopifyProductTemplateEpt(models.Model):
             shopify_template.write(vals)
         else:
             if odoo_product:
-                vals.update({"product_tmpl_id": odoo_product.product_tmpl_id.id})
+                vals["product_tmpl_id"] = odoo_product.product_tmpl_id.id
             shopify_template = self.create(vals)
 
         return shopify_template
@@ -907,7 +910,6 @@ class ShopifyProductTemplateEpt(models.Model):
         odoo_product_obj = self.env["product.product"]
         shopify_product_obj = self.env["shopify.product.product.ept"]
 
-        message = ""
         variants = template_data.get("variants")
         template_title = template_data.get("title", "")
         template_id = template_data.get("id", "")
@@ -921,37 +923,31 @@ class ShopifyProductTemplateEpt(models.Model):
             sku and shopify_skus.append(sku)
             barcode and shopify_barcodes.append(barcode)
             if barcode:
-                duplicate_barcode = odoo_product_obj.search([("barcode", "=", barcode)])
-                if duplicate_barcode:
+                if duplicate_barcode := odoo_product_obj.search(
+                    [("barcode", "=", barcode)]
+                ):
                     shopify_variant = shopify_product_obj.search([
                         ("shopify_instance_id", "=", instance.id),
                         ("variant_id", "=", variant_id)])
 
                     if shopify_variant and shopify_variant.product_id and \
-                            shopify_variant.product_id.id != duplicate_barcode.id:
-                        message = "Duplicate barcode found in Product: %s and ID: %s." % (template_title, template_id)
-                        return message
-
+                                shopify_variant.product_id.id != duplicate_barcode.id:
+                        return f"Duplicate barcode found in Product: {template_title} and ID: {template_id}."
         total_shopify_sku = len(set(shopify_skus))
         if len(shopify_skus) != total_shopify_sku:
-            message = "Duplicate SKU found in Product %s and ID: %s." % (template_title, template_id)
-            return message
-
+            return f"Duplicate SKU found in Product {template_title} and ID: {template_id}."
         total_shopify_barcodes = len(set(shopify_barcodes))
         if len(shopify_barcodes) != total_shopify_barcodes:
-            message = "Duplicate Barcode found in Product %s and ID: %s." % (template_title, template_id)
-            return message
-
+            return f"Duplicate Barcode found in Product {template_title} and ID: {template_id}."
         if not odoo_product and not shopify_product and instance.shopify_sync_product_with in ["barcode",
                                                                                                "sku_or_barcode"]:
             for barcode in shopify_barcodes:
                 if barcode:
-                    duplicate_barcode = odoo_product_obj.search([("barcode", "=", barcode)])
-                    if duplicate_barcode:
-                        message = "Duplicate barcode found in Product: %s and ID: %s." % (template_title, template_id)
-                        return message
-
-        return message
+                    if duplicate_barcode := odoo_product_obj.search(
+                        [("barcode", "=", barcode)]
+                    ):
+                        return f"Duplicate barcode found in Product: {template_title} and ID: {template_id}."
+        return ""
 
     def shopify_publish_unpublish_product(self):
         common_log_book_obj = self.env["common.log.book.ept"]
@@ -966,8 +962,7 @@ class ShopifyProductTemplateEpt(models.Model):
         })
         if self.shopify_tmpl_id:
             try:
-                new_product = shopify.Product.find(self.shopify_tmpl_id)
-                if new_product:
+                if new_product := shopify.Product.find(self.shopify_tmpl_id):
                     new_product.id = self.shopify_tmpl_id
                     if self._context.get("publish") == "shopify_unpublish":
                         new_product.published_scope = "null"
@@ -978,8 +973,7 @@ class ShopifyProductTemplateEpt(models.Model):
                     else:
                         new_product.published_scope = "web"
                         new_product.published_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-                    result = new_product.save()
-                    if result:
+                    if result := new_product.save():
                         result_dict = new_product.to_dict()
                         updated_at = self.convert_shopify_date_into_odoo_format(result_dict.get("updated_at"))
                         if self._context.get("publish") == "shopify_unpublish":
@@ -1004,11 +998,11 @@ class ShopifyProductTemplateEpt(models.Model):
                                 "website_published": website_published
                             })
             except:
-                message = "Template %s not found in shopify When Publish" % self.shopify_tmpl_id
+                message = f"Template {self.shopify_tmpl_id} not found in shopify When Publish"
                 vals = {
                     "message": message,
                     "model_id": model_id,
-                    "res_id": self.shopify_tmpl_id if self.shopify_tmpl_id else False,
+                    "res_id": self.shopify_tmpl_id or False,
                     "log_book_id": log_book_id.id if log_book_id else False,
                 }
                 self.env["common.log.lines.ept"].create(vals)

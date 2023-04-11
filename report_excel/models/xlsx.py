@@ -25,8 +25,7 @@ class XLSXEdit(object):
         self._data = {}
         self._data_drawing = {}
         self._res_data = None
-        self._conf = {}
-        self._conf['max_row_index'] = 0
+        self._conf = {'max_row_index': 0}
         self._node_rd_attr = {}
         self._style_cat = {}
         self._style_header_data = {}
@@ -41,7 +40,7 @@ class XLSXEdit(object):
             (:[$]?(?P<max_col>[A-Za-z]{1,3})?
             [$]?(?P<max_row>\d+)?)?
             """
-        self._ABSOLUTE_RE = re.compile('^' + self._RANGE_EXPR +'$', re.VERBOSE)
+        self._ABSOLUTE_RE = re.compile(f'^{self._RANGE_EXPR}$', re.VERBOSE)
         self._namespaces = {
             'ws': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
             'rel': 'http://schemas.openxmlformats.org/package/2006/relationships',
@@ -73,10 +72,7 @@ class XLSXEdit(object):
         self._conf['next_row_data_lines_out_index'] = len(res_data)
         self._res_data = res_data
     def check_conf(self, conf_data):
-        if conf_data['sheet_reference'] in self._sheet_paths:
-            return True
-        else:
-            return False
+        return conf_data['sheet_reference'] in self._sheet_paths
     def write_conf(self, conf_data):
         sheet_file = self._sheet_paths[conf_data['sheet_reference']]
         xml = self._get_xml(sheet_file)
@@ -124,13 +120,14 @@ class XLSXEdit(object):
                             [cell_r, cell_r_letter, ind],
                             cell_s, 
                             merge_cells_key_present]
-                    self._conf['_node_rd_attr'][int(node_row.get('r'))] = dict(node_row.attrib) 
+                    self._conf['_node_rd_attr'][int(node_row.get('r'))] = dict(node_row.attrib)
         matrix_template = [[False, a, None] for a in range(row_min_ind, row_max_ind + 1)]
         for i in matrix_template:
             i[2] = [[[self.cell_from_index(a,i[1]),self.get_column_letter(a),a,i[1]],{'section_ids':(0,),'present':False,'style':0,'mergecell':False,'formula':False, 'pack': False, 'value':None,'mergecell_cell':False, 'section_border': True}] for a in range(col_min_ind, col_max_ind + 1)]
-        sections_ids = []
-        for k,v in list(conf_data['data_lines']['section_boundaries'].items()):
-            sections_ids.append(v['section_chain_ids'])
+        sections_ids = [
+            v['section_chain_ids']
+            for k, v in list(conf_data['data_lines']['section_boundaries'].items())
+        ]
         sections_ids_sorted = sorted(sections_ids)
         for s_ids in sections_ids_sorted:
             scope = conf_data['data_lines']['section_boundaries'][s_ids[-1]]
@@ -163,29 +160,36 @@ class XLSXEdit(object):
     def write(self, sheet, cell, value, level="0", category=False, cell_ext=False, DrawingML=False):
         if value not in (True, False, None) and type(value) not in (int, float, str, date, datetime, bytes):
             raise TypeError('Only None, int, float, str, unicode, bytes')
-        if type(value) in (bytes,) or DrawingML['field_type'] in ('binary',)  :
-            if DrawingML['image_bool'] and type(value) in (bytes,):
+        if type(value) in (bytes,):
+            if DrawingML['image_bool']:
                 if value !='':
                     if sheet not in self._data_drawing:
                         self._data_drawing[sheet] = {}
                     self._data_drawing[sheet][cell] = {'value': value, 'DrawingML': DrawingML}                
                 return
             else:
-                if type(value) in (bytes,):
-                    value =  value.decode('utf-8')
-                    value = value[:32767] if len(value) > 32767 else value
+                value =  value.decode('utf-8')
+                value = value[:32767] if len(value) > 32767 else value
         if sheet not in self._data:
             self._data[sheet] = {}
         self._data[sheet][cell] = [value, str(level), category, cell_ext]
     def get_content(self):
-        exclude_files = ['/%s' % e[1] for e in list(self._sheet_paths.items()) if e[0] in list(self._data.keys())]
-        exclude_files.append('/xl/sharedStrings.xml')
-        exclude_files.append('/xl/workbook.xml')
-        exclude_files.append('[Content_Types].xml')
-        exclude_files.append('/xl/_rels/workbook.xml.rels')
+        exclude_files = [
+            f'/{e[1]}'
+            for e in list(self._sheet_paths.items())
+            if e[0] in list(self._data.keys())
+        ]
+        exclude_files.extend(
+            (
+                '/xl/sharedStrings.xml',
+                '/xl/workbook.xml',
+                '[Content_Types].xml',
+                '/xl/_rels/workbook.xml.rels',
+            )
+        )
         if self._calcChain:
             exclude_files.append('/xl/calcChain.xml')
-        exclude_files = [re.sub(r"\\","/",x) for x in exclude_files]        
+        exclude_files = [re.sub(r"\\","/",x) for x in exclude_files]
         if 'sheet_reference' in self._conf and len(self._data_drawing) and len(self._data_drawing[self._conf['sheet_reference']]):
             self._add_drawing()
         zip_file = self._create_base_zip(exclude_files=exclude_files)
@@ -248,21 +252,21 @@ class XLSXEdit(object):
                 Content_Types_xml.write(Content_Types_out,
                                     xml_declaration=True, 
                                     encoding="UTF-8", 
-                                    standalone="yes")        
+                                    standalone="yes")
             workbook_xml_rels_xml = self._get_xml('xl/_rels/workbook.xml.rels')
             workbook_xml_rels_root = workbook_xml_rels_xml.xpath('/rel:Relationships', namespaces=self._namespaces)[0]
             r_id_max = 0
             for node in workbook_xml_rels_xml.xpath('/rel:Relationships/rel:Relationship', namespaces=self._namespaces):
                 r_id = node.attrib['Id']
                 n_id = int(r_id[3:])
-                r_id_max = n_id if n_id > r_id_max else r_id_max
-            r_id_new = "rId"+ str(r_id_max + 1) 
+                r_id_max = max(n_id, r_id_max)
+            r_id_new = f"rId{str(r_id_max + 1)}"
             workbook_xml_rels_root.append(etree.Element('Relationship', Id=r_id_new, Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings", Target="sharedStrings.xml"))
             with open(os.path.join(self._zip_folder, 'xl/_rels/workbook.xml.rels'), 'wb') as workbook_xml_rels_out:
                 workbook_xml_rels_xml.write(workbook_xml_rels_out,
                                     xml_declaration=True, 
                                     encoding="UTF-8", 
-                                    standalone="yes")        
+                                    standalone="yes")
             self._shared_strings = self._get_xml('xl/sharedStrings.xml')
         self._shared_strings_root = self._shared_strings.xpath('/ws:sst', namespaces=self._namespaces)[0]
         try:
@@ -310,19 +314,13 @@ class XLSXEdit(object):
         pattern_params = {'Target': 'calcChain.xml'}
         pattern_r = '/rel:Relationships/rel:Relationship[@Target="%(Target)s"]' % pattern_params
         node_Relationship = xml.xpath(pattern_r, namespaces=self._namespaces)
-        if len(node_Relationship) :
-            return True
-        else:
-            return False
+        return bool(len(node_Relationship))
     def _create_base_zip(self, exclude_files):
         zip_file = ZipFile(self._zip_stream, mode='w', compression=ZIP_DEFLATED, allowZip64=True)
         for path, dirs, files in os.walk(self._zip_folder):
             rel_path = path[len(self._zip_folder):]
             for file_name in files:
-                if rel_path == '':
-                    zip_name = file_name
-                else:
-                    zip_name = os.path.join(rel_path, file_name)
+                zip_name = file_name if rel_path == '' else os.path.join(rel_path, file_name)
                 zip_name = re.sub(r"\\","/", zip_name)
                 if zip_name not in exclude_files:
                     zip_file.write(os.path.join(path, file_name), zip_name)

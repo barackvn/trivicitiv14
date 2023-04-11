@@ -10,9 +10,8 @@ class Image(ShopifyResource):
 
     @classmethod
     def _prefix(cls, options={}):
-        product_id = options.get("product_id")
-        if product_id:
-            return "%s/products/%s" % (cls.site, product_id)
+        if product_id := options.get("product_id"):
+            return f"{cls.site}/products/{product_id}"
         else:
             return cls.site
 
@@ -31,7 +30,9 @@ class Image(ShopifyResource):
         if self.is_new():
             return []
         query_params = { 'metafield[owner_id]': self.id, 'metafield[owner_resource]': 'product_image' }
-        return Metafield.find(from_ = '%s/metafields.json?%s' % (ShopifyResource.site, urllib.parse.urlencode(query_params)))
+        return Metafield.find(
+            from_=f'{ShopifyResource.site}/metafields.json?{urllib.parse.urlencode(query_params)}'
+        )
 
     def save(self):
         if 'product_id' not in self._prefix_options:

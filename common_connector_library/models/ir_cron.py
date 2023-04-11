@@ -16,7 +16,7 @@ class IrCron(models.Model):
                              [tuple(self.ids)], log_exceptions=False)
             difference = self.nextcall - datetime.now()
             diff_days = difference.days
-            if not diff_days < 0:
+            if diff_days >= 0:
                 days = diff_days * 1440 if diff_days > 0 else 0
                 minutes = int(difference.seconds / 60) + days
                 return {"result": minutes}

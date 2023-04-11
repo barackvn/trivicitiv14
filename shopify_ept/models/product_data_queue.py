@@ -90,8 +90,7 @@ class ShopifyProductDataQueue(models.Model):
             @param : self,vals
             @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 05/10/2019.
         """
-        sequence_id = self.env.ref("shopify_ept.seq_product_queue_data").ids
-        if sequence_id:
+        if sequence_id := self.env.ref("shopify_ept.seq_product_queue_data").ids:
             record_name = self.env["ir.sequence"].browse(sequence_id).next_by_id()
         else:
             record_name = "/"
@@ -114,14 +113,16 @@ class ShopifyProductDataQueue(models.Model):
             if count == 125:
                 product_queue = self.shopify_create_product_queue(instance, skip_existing_product=skip_existing_product)
                 product_queue_list.append(product_queue.id)
-                message = "Product Queue Created {}".format(product_queue.name)
+                message = f"Product Queue Created {product_queue.name}"
                 bus_bus_obj.sendone((self._cr.dbname, "res.partner", self.env.user.partner_id.id),
                                     {"type": "simple_notification", "title": "Shopify Connector",
                                      "message": message, "sticky": False, "warning": True})
                 _logger.info(message)
                 count = 0
                 if template_ids:
-                    product_queue.message_post(body="%s products are not imported" % (",".join(template_ids)))
+                    product_queue.message_post(
+                        body=f'{",".join(template_ids)} products are not imported'
+                    )
             self.shopify_create_product_data_queue_line(result, instance, product_queue)
             count = count + 1
         self._cr.commit()
@@ -138,26 +139,29 @@ class ShopifyProductDataQueue(models.Model):
         if template_ids:
             # Below one line is used to find only character values from template ids.
             re.findall("[a-zA-Z]+", template_ids)
-            if len(template_ids.split(",")) <= 100:
-                # The template_ids is a list of all template ids which response did not given by
-                # shopify.
-                template_ids = list(set(re.findall(re.compile(r"(\d+)"), template_ids)))
-                results = shopify.Product().find(ids=",".join(template_ids))
-                if results:
-                    _logger.info(
-                        "Length of Shopify Products %s import from instance : %s" % (len(results), instance.name))
-                    template_ids = [template_id.strip() for template_id in template_ids]
-                    # Below process to identify which id response did not give by Shopify.
-                    [template_ids.remove(str(result.id)) for result in results if str(result.id) in template_ids]
-                    product_queue_list += self.create_product_queues(instance, results, False, template_ids)
-            else:
+            if len(template_ids.split(",")) > 100:
                 raise UserError(_("Please enter the product template ids 100 or less"))
+            # The template_ids is a list of all template ids which response did not given by
+            # shopify.
+            template_ids = list(set(re.findall(re.compile(r"(\d+)"), template_ids)))
+            results = shopify.Product().find(ids=",".join(template_ids))
+            if results:
+                _logger.info(
+                    f"Length of Shopify Products {len(results)} import from instance : {instance.name}"
+                )
+                template_ids = [template_id.strip() for template_id in template_ids]
+                # Below process to identify which id response did not give by Shopify.
+                [template_ids.remove(str(result.id)) for result in results if str(result.id) in template_ids]
+                product_queue_list += self.create_product_queues(instance, results, False, template_ids)
         else:
-            if not instance.shopify_last_date_product_import:
-                results = shopify.Product().find(limit=250)
-            else:
-                results = shopify.Product().find(updated_at_min=instance.shopify_last_date_product_import, limit=250)
-
+            results = (
+                shopify.Product().find(
+                    updated_at_min=instance.shopify_last_date_product_import,
+                    limit=250,
+                )
+                if instance.shopify_last_date_product_import
+                else shopify.Product().find(limit=250)
+            )
             product_queue_list += self.create_product_queues(instance, results, skip_existing_product)
 
             if len(results) >= 250:
@@ -189,10 +193,13 @@ class ShopifyProductDataQueue(models.Model):
                     try:
                         result = shopify.Product().find(page_info=page_info, limit=250)
                     except ClientError as error:
-                        if hasattr(error, "response"):
-                            if error.response.code == 429 and error.response.msg == "Too Many Requests":
-                                time.sleep(5)
-                                result = shopify.Product().find(page_info=page_info, limit=250)
+                        if (
+                            hasattr(error, "response")
+                            and error.response.code == 429
+                            and error.response.msg == "Too Many Requests"
+                        ):
+                            time.sleep(5)
+                            result = shopify.Product().find(page_info=page_info, limit=250)
                     except Exception as error:
                         raise UserError(error)
                     if result:
@@ -225,18 +232,19 @@ class ShopifyProductDataQueue(models.Model):
         @author: Maulik Barad on Date 01-Sep-2020.
         """
         product_data_queue_line_obj = self.env["shopify.product.data.queue.line.ept"]
-        product_queue_line_vals = {}
-
         # No need to convert the response into dictionary, when response is coming from webhook.
         if not isinstance(result, dict):
             result = result.to_dict()
         data = json.dumps(result)
-        product_queue_line_vals.update({"product_data_id": result.get("id"),
-                                        "shopify_instance_id": instance and instance.id or False,
-                                        "name": result.get("title"),
-                                        "synced_product_data": data,
-                                        "product_data_queue_id": product_data_queue and product_data_queue.id or False,
-                                        })
+        product_queue_line_vals = {} | {
+            "product_data_id": result.get("id"),
+            "shopify_instance_id": instance and instance.id or False,
+            "name": result.get("title"),
+            "synced_product_data": data,
+            "product_data_queue_id": product_data_queue
+            and product_data_queue.id
+            or False,
+        }
         product_data_queue_line_obj.create(product_queue_line_vals)
         return True
 
@@ -253,19 +261,19 @@ class ShopifyProductDataQueue(models.Model):
             model_id = ir_model_obj.search([('model', '=', 'shopify.order.data.queue.ept')])
             data_ref = queue_line.shopify_order_id
             note = 'Your order has not been imported because of the product of order Has a new attribute Shopify ' \
-                   'Order Reference : %s' % data_ref
+                       'Order Reference : %s' % data_ref
         else:
             queue_id = queue_line.product_data_queue_id
             model_id = ir_model_obj.search([('model', '=', 'shopify.product.data.queue.ept')])
             data_ref = queue_line.product_data_id
             note = 'Your product was not synced because you tried to add new attribute | Product Data Reference ' \
-                   ': %s' % data_ref
+                       ': %s' % data_ref
 
         activity_type_id = queue_id and queue_id.shopify_instance_id.shopify_activity_type_id.id
         date_deadline = datetime.strftime(
             datetime.now() + timedelta(days=int(queue_id.shopify_instance_id.shopify_date_deadline)), "%Y-%m-%d")
         if queue_id:
-            note_2 = "<p>" + note + '</p>'
+            note_2 = f"<p>{note}</p>"
             for user_id in queue_id.shopify_instance_id.shopify_user_ids:
                 mail_activity = mail_activity_obj.search(
                     [('res_model_id', '=', model_id.id), ('user_id', '=', user_id.id), ('res_name', '=', queue_id.name),
@@ -281,7 +289,7 @@ class ShopifyProductDataQueue(models.Model):
                     try:
                         mail_activity_obj.create(vals)
                     except Exception as error:
-                        _logger.info("Couldn't create schedule activity :%s" % str(error))
+                        _logger.info(f"Couldn't create schedule activity :{str(error)}")
         return True
 
     def create_shopify_product_queue_from_webhook(self, product_data, instance):
@@ -293,10 +301,10 @@ class ShopifyProductDataQueue(models.Model):
         product_data_queue = self.search([("created_by", "=", "webhook"), ("state", "=", "draft"),
                                           ("shopify_instance_id", "=", instance.id)])
         if product_data_queue:
-            message = "Product %s added into Queue %s." % (product_data.get("id"), product_data_queue.name)
+            message = f'Product {product_data.get("id")} added into Queue {product_data_queue.name}.'
         else:
             product_data_queue = self.shopify_create_product_queue(instance, "webhook")
-            message = "Product Queue %s created." % product_data_queue.name
+            message = f"Product Queue {product_data_queue.name} created."
         _logger.info(message)
 
         self.shopify_create_product_data_queue_line(product_data, instance, product_data_queue)

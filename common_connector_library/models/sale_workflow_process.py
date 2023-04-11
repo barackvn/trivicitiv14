@@ -72,18 +72,35 @@ class SaleWorkflowProcess(models.Model):
         """
         sale_order_obj = self.env['sale.order']
         workflow_process_obj = self.env['sale.workflow.process.ept']
-        if not auto_workflow_process_id:
-            work_flow_process_records = workflow_process_obj.search([])
-        else:
-            work_flow_process_records = workflow_process_obj.browse(auto_workflow_process_id)
-
-        if not order_ids:
-            orders = sale_order_obj.search([('auto_workflow_process_id', 'in', work_flow_process_records.ids),
-                                            ('state', 'not in', ('done', 'cancel', 'sale')),
-                                            ('invoice_status', '!=', 'invoiced')])
-        else:
-            orders = sale_order_obj.search([('auto_workflow_process_id', 'in', work_flow_process_records.ids),
-                                            ('id', 'in', order_ids)])
+        work_flow_process_records = (
+            workflow_process_obj.browse(auto_workflow_process_id)
+            if auto_workflow_process_id
+            else workflow_process_obj.search([])
+        )
+        orders = (
+            sale_order_obj.search(
+                [
+                    (
+                        'auto_workflow_process_id',
+                        'in',
+                        work_flow_process_records.ids,
+                    ),
+                    ('id', 'in', order_ids),
+                ]
+            )
+            if order_ids
+            else sale_order_obj.search(
+                [
+                    (
+                        'auto_workflow_process_id',
+                        'in',
+                        work_flow_process_records.ids,
+                    ),
+                    ('state', 'not in', ('done', 'cancel', 'sale')),
+                    ('invoice_status', '!=', 'invoiced'),
+                ]
+            )
+        )
         orders.process_orders_and_invoices_ept()
 
         return True
@@ -111,7 +128,8 @@ class SaleWorkflowProcess(models.Model):
 
                 order.auto_shipped_order_ept(customer_location, mrp_module)
 
-                delivered_lines = order.order_line.filtered(lambda l:l.product_id.invoice_policy != 'order')
-                if delivered_lines:
+                if delivered_lines := order.order_line.filtered(
+                    lambda l: l.product_id.invoice_policy != 'order'
+                ):
                     order.validate_and_paid_invoices_ept(self)
         return True

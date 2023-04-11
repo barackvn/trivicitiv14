@@ -41,54 +41,62 @@ class StockPicking(models.Model):
 
     @api.onchange('custom_barcode_scanned')
     def _on_custom_barcode_changed(self):
-        barcode = self.custom_barcode_scanned
-        if barcode:
+        if barcode := self.custom_barcode_scanned:
             self.custom_barcode_scanned = ""
             return self.on_barcode_scanned(barcode)
 
     def on_barcode_scanned(self, barcode):
-        if barcode:
-            product_ids = self.move_ids_without_package.mapped('product_id')
-            if self.picking_type_code == 'incoming':
-                move_obj = self.move_ids_without_package.filtered(lambda m: m.product_uom_qty > m.quantity_done)
-                incoming_result_list = ''
-                for move in move_obj:
-                    move_lines = self.env['stock.move.line'].search([('move_id', '=', move._origin.id), ('qty_done', '!=', 0)])
-                    quantity_done = 0
-                    for move_line in move_lines:
-                        quantity_done += move_line.product_uom_id._compute_quantity(
-                            move_line.qty_done, move.product_uom, round=False)
-                    quantity = move.product_uom_qty - quantity_done
-                    if quantity > 0:
-                        result = self.assign_incoming_move(move, barcode, quantity)
-                        if result == True:
-                            incoming_result_list = ''
-                            break
-                        else:
-                            incoming_result_list = incoming_result_list + (', ' if incoming_result_list else '') +  result
-                if incoming_result_list:
-                    return {
-                        'warning': {'title': _('Warning'), 'message': _(
-                            'Existing Serial numbers (%s). Please correct the serial numbers encoded.') % incoming_result_list}
-                    }
-
-            else:
-                stock_quant = self.env['stock.quant'].search([('lot_id.name', '=', barcode), ('location_id', '=', self.location_id.id), ('product_id', 'in', product_ids.ids)])
-                if stock_quant:
-                    if len(stock_quant) == 1 and stock_quant.available_quantity:
-                        product_id = stock_quant[0].product_id
-                        move_obj = self.move_ids_without_package.filtered(lambda m: m.product_id == product_id)
-                        if move_obj:
-                            # if product_id.tracking == 'serial':
-                                for move in move_obj:
-                                    if move.product_uom_qty > move.reserved_availability:
-                                        need = move.product_uom_qty - move.reserved_availability
-                                        self._update_reserved_quantity(move, need, stock_quant, self.location_id, stock_quant.lot_id)
-                                        continue
+        if not barcode:
+            return
+        product_ids = self.move_ids_without_package.mapped('product_id')
+        if self.picking_type_code == 'incoming':
+            move_obj = self.move_ids_without_package.filtered(lambda m: m.product_uom_qty > m.quantity_done)
+            incoming_result_list = ''
+            for move in move_obj:
+                move_lines = self.env['stock.move.line'].search([('move_id', '=', move._origin.id), ('qty_done', '!=', 0)])
+                quantity_done = sum(
+                    move_line.product_uom_id._compute_quantity(
+                        move_line.qty_done, move.product_uom, round=False
+                    )
+                    for move_line in move_lines
+                )
+                quantity = move.product_uom_qty - quantity_done
+                if quantity > 0:
+                    result = self.assign_incoming_move(move, barcode, quantity)
+                    if result == True:
+                        incoming_result_list = ''
+                        break
                     else:
-                        pass
-                else:
-                    raise ValidationError(_('%s NFC Tag not exist for delivered product at %s location' % (barcode, self.location_id.name)))
+                        incoming_result_list = incoming_result_list + (', ' if incoming_result_list else '') +  result
+            if incoming_result_list:
+                return {
+                    'warning': {'title': _('Warning'), 'message': _(
+                        'Existing Serial numbers (%s). Please correct the serial numbers encoded.') % incoming_result_list}
+                }
+
+        elif stock_quant := self.env['stock.quant'].search(
+            [
+                ('lot_id.name', '=', barcode),
+                ('location_id', '=', self.location_id.id),
+                ('product_id', 'in', product_ids.ids),
+            ]
+        ):
+            if len(stock_quant) == 1 and stock_quant.available_quantity:
+                product_id = stock_quant[0].product_id
+                if move_obj := self.move_ids_without_package.filtered(
+                    lambda m: m.product_id == product_id
+                ):
+                            # if product_id.tracking == 'serial':
+                    for move in move_obj:
+                        if move.product_uom_qty > move.reserved_availability:
+                            need = move.product_uom_qty - move.reserved_availability
+                            self._update_reserved_quantity(move, need, stock_quant, self.location_id, stock_quant.lot_id)
+        else:
+            raise ValidationError(
+                _(
+                    f'{barcode} NFC Tag not exist for delivered product at {self.location_id.name} location'
+                )
+            )
 
     def _update_reserved_quantity(self, move, need, stock_quant, location_id, lot_id=None, package_id=None, owner_id=None, strict=True):
         assigned_moves = self.env['stock.move']
@@ -129,23 +137,23 @@ class StockPicking(models.Model):
 
         # Find a candidate move line to update or create a new one.
         for reserved_quant, quantity in quants:
-            to_update = move.move_line_ids.filtered(lambda ml: ml._reservation_is_updatable(quantity, reserved_quant))
-            if to_update:
+            if to_update := move.move_line_ids.filtered(
+                lambda ml: ml._reservation_is_updatable(quantity, reserved_quant)
+            ):
                 to_update[0].with_context(
                     bypass_reservation_update=True).product_uom_qty += move.product_id.uom_id._compute_quantity(
                     quantity, to_update[0].product_uom_id, rounding_method='HALF-UP')
-            else:
-                if move.product_id.tracking == 'serial':
-                    for i in range(0, int(quantity)):
-                        move_line_vals = move._prepare_move_line_vals(quantity=1, reserved_quant=reserved_quant)
-                        move_line_vals.update({'temp_move_id': move._origin.id})
-                        move_line = self.env['stock.move.line'].create(move_line_vals)
-                        self._compute_move_reserved_availability(move)
-                else:
-                    move_line_vals = move._prepare_move_line_vals(quantity=quantity, reserved_quant=reserved_quant)
+            elif move.product_id.tracking == 'serial':
+                for _ in range(int(quantity)):
+                    move_line_vals = move._prepare_move_line_vals(quantity=1, reserved_quant=reserved_quant)
                     move_line_vals.update({'temp_move_id': move._origin.id})
-                    self.env['stock.move.line'].create(move_line_vals)
+                    move_line = self.env['stock.move.line'].create(move_line_vals)
                     self._compute_move_reserved_availability(move)
+            else:
+                move_line_vals = move._prepare_move_line_vals(quantity=quantity, reserved_quant=reserved_quant)
+                move_line_vals.update({'temp_move_id': move._origin.id})
+                self.env['stock.move.line'].create(move_line_vals)
+                self._compute_move_reserved_availability(move)
         if taken_quantity == 0:
             pass
         elif move.product_id.tracking == 'serial':
@@ -183,12 +191,13 @@ class StockPicking(models.Model):
 
     def assign_incoming_move(self, move, barcode, quantity):
         if move.product_id.tracking == 'serial':
-            existing_lots = self.env['stock.production.lot'].search([
-                ('company_id', '=', self.company_id.id),
-                ('product_id', '=', self.product_id.id),
-                ('name', '=', barcode),
-            ])
-            if existing_lots:
+            if existing_lots := self.env['stock.production.lot'].search(
+                [
+                    ('company_id', '=', self.company_id.id),
+                    ('product_id', '=', self.product_id.id),
+                    ('name', '=', barcode),
+                ]
+            ):
                 return barcode
             move_line_vals = move._prepare_move_line_vals(quantity=1)
             move_line_vals.update({'move_id': move._origin.id, 'lot_name': barcode, 'qty_done': 1, 'product_uom_qty': 0})

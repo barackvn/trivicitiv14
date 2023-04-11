@@ -76,7 +76,7 @@ class ResourceNotFound(ClientError):
 
     def __init__(self, response=None, message=None):
         if response is not None and message is None:
-            message = '%s: %s' % (response.msg, response.url)
+            message = f'{response.msg}: {response.url}'
 
         ClientError.__init__(self, response=response, message=message)
 
@@ -114,9 +114,7 @@ class Request(urllib.request.Request):
 
     def get_method(self):
         """Return the HTTP method."""
-        if not self._method:
-            return urllib.request.Request.get_method(self)
-        return self._method
+        return self._method or urllib.request.Request.get_method(self)
 
     def set_method(self, method):
         """Set the HTTP method."""
@@ -163,8 +161,7 @@ class Response(object):
         return False
 
     def __repr__(self):
-        return 'Response(code=%s, body="%s", headers=%s, msg="%s")' % (
-            self.code, self.body, self.headers, self.msg)
+        return f'Response(code={self.code}, body="{self.body}", headers={self.headers}, msg="{self.msg}")'
 
     def __getitem__(self, key):
         return self.headers[key]
@@ -208,7 +205,9 @@ class Connection(object):
         self.password = password or self.password or ''
 
         if self.user or self.password:
-            self.auth = base64.b64encode(('%s:%s' % (self.user, self.password)).encode('utf-8')).decode('utf-8')
+            self.auth = base64.b64encode(
+                f'{self.user}:{self.password}'.encode('utf-8')
+            ).decode('utf-8')
         else:
             self.auth = None
         self.timeout = timeout
@@ -227,7 +226,7 @@ class Connection(object):
 
         host = parts.hostname
         if parts.port:
-            host += ":" + str(parts.port)
+            host += f":{str(parts.port)}"
 
         new_site = urllib.parse.urlunparse((parts.scheme, host, '', '', '', ''))
         return (new_site, parts.username, parts.password)
@@ -262,7 +261,7 @@ class Connection(object):
                 request.add_header(key, value)
         if self.auth:
             # Insert basic authentication header
-            request.add_header('Authorization', 'Basic ' + self.auth)
+            request.add_header('Authorization', f'Basic {self.auth}')
         if request.headers:
             header_string = '\n'.join([':'.join((k, v)) for k, v in
                                        six.iteritems(request.headers)])

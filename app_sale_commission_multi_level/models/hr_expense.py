@@ -16,6 +16,4 @@ class HrExpense(models.Model):
     is_commission = fields.Boolean(string='Is Commission?', default=False)
 
     def action_move_create(self):
-        # todo: 生成的会计帐，目标 partner 看财务要求来对应到相关 partner
-        ids = super(HrExpense, self).action_move_create()
-        return ids
+        return super(HrExpense, self).action_move_create()
